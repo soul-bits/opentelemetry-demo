@@ -1,0 +1,142 @@
+# Copyright The OpenTelemetry Authors
+# SPDX-License-Identifier: Apache-2.0
+
+groups:
+  - name: observability_agent_alerts
+    interval: 30s
+    rules:
+      # High HTTP error rate (5xx) on any service
+      - alert: HighHTTPErrorRate
+        expr: |
+          (
+            sum(rate(http_server_request_duration_seconds_count{http_response_status_code=~"5.."}[5m])) by (service_name)
+            /
+            sum(rate(http_server_request_duration_seconds_count[5m])) by (service_name)
+          ) > 0.05
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High HTTP error rate on {{ $labels.service_name }}"
+          description: "Error rate (5xx) is {{ $value | humanizePercentage }} on {{ $labels.service_name }}"
+
+      # High HTTP request latency (P95)
+      - alert: HighHTTPLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(http_server_request_duration_seconds_bucket[5m])) by (le, service_name)
+          ) > 0.5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High HTTP latency on {{ $labels.service_name }}"
+          description: "P95 latency is {{ $value | humanizeDuration }} on {{ $labels.service_name }}"
+
+      # High RPC error rate (non-zero status codes)
+      - alert: HighRPCErrorRate
+        expr: |
+          (
+            sum(rate(rpc_server_duration_milliseconds_count{rpc_grpc_status_code!="0"}[5m])) by (service_name)
+            /
+            sum(rate(rpc_server_duration_milliseconds_count[5m])) by (service_name)
+          ) > 0.1
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High RPC error rate on {{ $labels.service_name }}"
+          description: "RPC error rate is {{ $value | humanizePercentage }} on {{ $labels.service_name }}"
+
+      # High RPC latency (P95)
+      - alert: HighRPCLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(rpc_server_duration_milliseconds_bucket[5m])) by (le, service_name)
+          ) > 500
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High RPC latency on {{ $labels.service_name }}"
+          description: "P95 latency is {{ $value | humanize }}ms on {{ $labels.service_name }}"
+
+      # High database operation latency
+      - alert: HighDatabaseLatency
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(db_client_operation_duration_seconds_bucket[5m])) by (le, service_name)
+          ) > 1.0
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High database latency on {{ $labels.service_name }}"
+          description: "P95 DB latency is {{ $value | humanizeDuration }} on {{ $labels.service_name }}"
+
+      # Database connection pool saturation
+      - alert: DatabaseConnectionPoolSaturation
+        expr: |
+          (
+            db_sql_connection_open
+            /
+            db_sql_connection_max_open
+          ) > 0.8
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Database connection pool saturation on {{ $labels.service_name }}"
+          description: "Connection pool is {{ $value | humanizePercentage }} full"
+
+      # High OTel Collector receiver drop rate
+      - alert: OTelCollectorReceiverDrops
+        expr: |
+          rate(otelcol_receiver_refused_spans_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+          component: otel-collector
+        annotations:
+          summary: "OTel Collector dropping spans"
+          description: "Receiver {{ $labels.receiver }} dropping spans at {{ $value | humanize }} per second"
+
+      # High OTel Collector exporter failures
+      - alert: OTelCollectorExporterFailures
+        expr: |
+          rate(otelcol_exporter_send_failed_spans_total[5m]) > 0
+        for: 2m
+        labels:
+          severity: warning
+          component: otel-collector
+        annotations:
+          summary: "OTel Collector exporter failures"
+          description: "Exporter {{ $labels.exporter }} failing at {{ $value | humanize }} spans/sec"
+
+      # OTel Collector queue overflow risk
+      - alert: OTelCollectorQueueFull
+        expr: |
+          (
+            otelcol_exporter_queue_size
+            /
+            otelcol_exporter_queue_capacity
+          ) > 0.8
+        for: 1m
+        labels:
+          severity: critical
+          component: otel-collector
+        annotations:
+          summary: "OTel Collector queue near capacity"
+          description: "Queue {{ $labels.exporter }} is {{ $value | humanizePercentage }} full"
+
+      # Active HTTP requests spike
+      - alert: HTTPRequestsSpike
+        expr: |
+          http_server_active_requests > 100
+        for: 1m
+        labels:
+          severity: info
+        annotations:
+          summary: "High number of active HTTP requests on {{ $labels.service_name }}"
+          description: "Active requests: {{ $value | humanize }}"
+

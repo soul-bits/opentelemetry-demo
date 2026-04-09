@@ -30,6 +30,26 @@ services:
       - "9093:9093"
     restart: unless-stopped
     logging: *logging
+    depends_on:
+      - alert-webhook-server
+
+  # Alert Webhook Server - writes alerts to a file
+  alert-webhook-server:
+    image: python:3.12-slim
+    container_name: alert-webhook-server
+    working_dir: /app
+    volumes:
+      - ./src/prometheus/alert-webhook-server.py:/app/alert-webhook-server.py
+      - /tmp:/tmp
+    command: sh -c "pip install flask -q && python alert-webhook-server.py"
+    ports:
+      - "5001:5000"
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+    logging: *logging
   # AdService
   # ad:
   #   image: ${IMAGE_NAME}:${DEMO_VERSION}-ad
@@ -101,11 +121,6 @@ services:
   checkout:
     image: ${IMAGE_NAME}:${DEMO_VERSION}-checkout
     container_name: checkout
-    build:
-      context: ./
-      dockerfile: ${CHECKOUT_DOCKERFILE}
-      cache_from:
-        - ${IMAGE_NAME}:${IMAGE_VERSION}-checkout
     deploy:
       resources:
         limits:
@@ -117,10 +132,10 @@ services:
       - CHECKOUT_PORT
       - CART_ADDR
       - CURRENCY_ADDR
-      # - EMAIL_ADDR
+      - EMAIL_ADDR
       - FLAGD_HOST
       - FLAGD_PORT
-      # - PAYMENT_ADDR
+      - PAYMENT_ADDR
       - PRODUCT_CATALOG_ADDR
       - SHIPPING_ADDR
       - GOMEMLIMIT=16MiB
@@ -576,12 +591,6 @@ services:
       - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=high
       - OTEL_SERVICE_NAME=shipping
       - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
-    healthcheck:
-      test: ["CMD-SHELL", "timeout 1 bash -c '>/dev/tcp/localhost/${SHIPPING_PORT}'"]
-      start_period: 10s
-      interval: 5s
-      timeout: 10s
-      retries: 10
     depends_on:
       otel-collector:
         condition: service_started
@@ -773,6 +782,7 @@ services:
       - --enable-feature=exemplar-storage
     volumes:
       - ./src/prometheus/prometheus-config.yaml:/etc/prometheus/prometheus-config.yaml
+      - ./src/prometheus/alert-rules.yml:/etc/prometheus/alert-rules.yml
       - ./src/prometheus/alertmanager.yml:/etc/prometheus/alertmanager.yaml
     deploy:
       resources:
