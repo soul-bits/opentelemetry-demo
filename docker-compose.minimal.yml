@@ -1,3 +1,4 @@
+
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
@@ -17,7 +18,18 @@ services:
   # ******************
   # Core Demo Services
   # ******************
-
+  # Alertmanager
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: alertmanager
+    volumes:
+      - ./src/prometheus/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+    ports:
+      - "9093:9093"
+    restart: unless-stopped
+    logging: *logging
   # AdService
   # ad:
   #   image: ${IMAGE_NAME}:${DEMO_VERSION}-ad
@@ -296,6 +308,8 @@ services:
       grafana:
         condition: service_started
     dns_search: ""
+    networks:
+      - default
 
   # image-provider
   # image-provider:
@@ -757,8 +771,10 @@ services:
       - --web.route-prefix=/
       - --web.enable-otlp-receiver
       - --enable-feature=exemplar-storage
+      - --alertmanager.config.file=/etc/prometheus/alertmanager.yaml
     volumes:
       - ./src/prometheus/prometheus-config.yaml:/etc/prometheus/prometheus-config.yaml
+      - ./src/prometheus/alertmanager.yml:/etc/prometheus/alertmanager.yaml
     deploy:
       resources:
         limits:

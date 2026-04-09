@@ -1,5 +1,10 @@
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - 'alertmanager:9093'
 
 global:
   # Align Prometheus scrape interval with the OTel SDKs' export interval for consistency (see OTEL_METRIC_EXPORT_INTERVAL)
