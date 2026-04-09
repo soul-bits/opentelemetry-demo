@@ -771,7 +771,6 @@ services:
       - --web.route-prefix=/
       - --web.enable-otlp-receiver
       - --enable-feature=exemplar-storage
-      - --alertmanager.config.file=/etc/prometheus/alertmanager.yaml
     volumes:
       - ./src/prometheus/prometheus-config.yaml:/etc/prometheus/prometheus-config.yaml
       - ./src/prometheus/alertmanager.yml:/etc/prometheus/alertmanager.yaml
