@@ -19,38 +19,38 @@ services:
   # ******************
 
   # AdService
-  ad:
-    image: ${IMAGE_NAME}:${DEMO_VERSION}-ad
-    container_name: ad
-    build:
-      context: ./
-      dockerfile: ${AD_DOCKERFILE}
-      cache_from:
-        - ${IMAGE_NAME}:${IMAGE_VERSION}-ad
-      args:
-        OTEL_JAVA_AGENT_VERSION: ${OTEL_JAVA_AGENT_VERSION}
-    deploy:
-      resources:
-        limits:
-          memory: 300M
-    restart: unless-stopped
-    ports:
-      - "${AD_PORT}"
-    environment:
-      - AD_PORT
-      - FLAGD_HOST
-      - FLAGD_PORT
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://${OTEL_COLLECTOR_HOST}:${OTEL_COLLECTOR_PORT_HTTP}
-      - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
-      - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=medium
-      - OTEL_LOGS_EXPORTER=otlp
-      - OTEL_SERVICE_NAME=ad
-      # Workaround on OSX for https://bugs.openjdk.org/browse/JDK-8345296
-      - _JAVA_OPTIONS
-    depends_on:
-      otel-collector:
-        condition: service_started
-    logging: *logging
+  # ad:
+  #   image: ${IMAGE_NAME}:${DEMO_VERSION}-ad
+  #   container_name: ad
+  #   build:
+  #     context: ./
+  #     dockerfile: ${AD_DOCKERFILE}
+  #     cache_from:
+  #       - ${IMAGE_NAME}:${IMAGE_VERSION}-ad
+  #     args:
+  #       OTEL_JAVA_AGENT_VERSION: ${OTEL_JAVA_AGENT_VERSION}
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 300M
+  #   restart: unless-stopped
+  #   ports:
+  #     - "${AD_PORT}"
+  #   environment:
+  #     - AD_PORT
+  #     - FLAGD_HOST
+  #     - FLAGD_PORT
+  #     - OTEL_EXPORTER_OTLP_ENDPOINT=http://${OTEL_COLLECTOR_HOST}:${OTEL_COLLECTOR_PORT_HTTP}
+  #     - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
+  #     - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=medium
+  #     - OTEL_LOGS_EXPORTER=otlp
+  #     - OTEL_SERVICE_NAME=ad
+  #     # Workaround on OSX for https://bugs.openjdk.org/browse/JDK-8345296
+  #     - _JAVA_OPTIONS
+  #   depends_on:
+  #     otel-collector:
+  #       condition: service_started
+  #   logging: *logging
 
   # Cart service
   cart:
@@ -105,10 +105,10 @@ services:
       - CHECKOUT_PORT
       - CART_ADDR
       - CURRENCY_ADDR
-      - EMAIL_ADDR
+      # - EMAIL_ADDR
       - FLAGD_HOST
       - FLAGD_PORT
-      - PAYMENT_ADDR
+      # - PAYMENT_ADDR
       - PRODUCT_CATALOG_ADDR
       - SHIPPING_ADDR
       - GOMEMLIMIT=16MiB
@@ -120,10 +120,6 @@ services:
       cart:
         condition: service_started
       currency:
-        condition: service_started
-      email:
-        condition: service_started
-      payment:
         condition: service_started
       product-catalog:
         condition: service_started
@@ -165,33 +161,33 @@ services:
     logging: *logging
 
   # Email service
-  email:
-    image: ${IMAGE_NAME}:${DEMO_VERSION}-email
-    container_name: email
-    build:
-      context: ./src/email
-      cache_from:
-        - ${IMAGE_NAME}:${IMAGE_VERSION}-email
-    deploy:
-      resources:
-        limits:
-          memory: 100M
-    restart: unless-stopped
-    ports:
-      - "${EMAIL_PORT}"
-    environment:
-      - APP_ENV=production
-      - EMAIL_PORT
-      - FLAGD_HOST
-      - FLAGD_PORT
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://${OTEL_COLLECTOR_HOST}:${OTEL_COLLECTOR_PORT_HTTP}
-      - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
-      - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=medium
-      - OTEL_SERVICE_NAME=email
-    depends_on:
-      otel-collector:
-        condition: service_started
-    logging: *logging
+  # email:
+  #   image: ${IMAGE_NAME}:${DEMO_VERSION}-email
+  #   container_name: email
+  #   build:
+  #     context: ./src/email
+  #     cache_from:
+  #       - ${IMAGE_NAME}:${IMAGE_VERSION}-email
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 100M
+  #   restart: unless-stopped
+  #   ports:
+  #     - "${EMAIL_PORT}"
+  #   environment:
+  #     - APP_ENV=production
+  #     - EMAIL_PORT
+  #     - FLAGD_HOST
+  #     - FLAGD_PORT
+  #     - OTEL_EXPORTER_OTLP_ENDPOINT=http://${OTEL_COLLECTOR_HOST}:${OTEL_COLLECTOR_PORT_HTTP}
+  #     - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
+  #     - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=medium
+  #     - OTEL_SERVICE_NAME=email
+  #   depends_on:
+  #     otel-collector:
+  #       condition: service_started
+  #   logging: *logging
 
   # Frontend
   frontend:
@@ -230,8 +226,8 @@ services:
       - FLAGD_HOST
       - FLAGD_PORT
     depends_on:
-      ad:
-        condition: service_started
+      # ad:
+      #   condition: service_started
       cart:
         condition: service_started
       checkout:
@@ -248,8 +244,8 @@ services:
         condition: service_started
       otel-collector:
         condition: service_started
-      image-provider:
-        condition: service_started
+      # image-provider:
+      #   condition: service_started
     logging: *logging
 
   # Frontend Proxy (Envoy)
@@ -302,31 +298,31 @@ services:
     dns_search: ""
 
   # image-provider
-  image-provider:
-    image: ${IMAGE_NAME}:${DEMO_VERSION}-image-provider
-    container_name: image-provider
-    build:
-      context: ./
-      dockerfile: ${IMAGE_PROVIDER_DOCKERFILE}
-      cache_from:
-        - ${IMAGE_NAME}:${IMAGE_VERSION}-image-provider
-    deploy:
-      resources:
-        limits:
-          memory: 120M
-    restart: unless-stopped
-    ports:
-      - "${IMAGE_PROVIDER_PORT}"
-    environment:
-      - IMAGE_PROVIDER_PORT
-      - OTEL_COLLECTOR_HOST
-      - OTEL_COLLECTOR_PORT_GRPC
-      - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=low
-      - OTEL_SERVICE_NAME=image-provider
-    depends_on:
-      otel-collector:
-        condition: service_started
-    logging: *logging
+  # image-provider:
+  #   image: ${IMAGE_NAME}:${DEMO_VERSION}-image-provider
+  #   container_name: image-provider
+  #   build:
+  #     context: ./
+  #     dockerfile: ${IMAGE_PROVIDER_DOCKERFILE}
+  #     cache_from:
+  #       - ${IMAGE_NAME}:${IMAGE_VERSION}-image-provider
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 120M
+  #   restart: unless-stopped
+  #   ports:
+  #     - "${IMAGE_PROVIDER_PORT}"
+  #   environment:
+  #     - IMAGE_PROVIDER_PORT
+  #     - OTEL_COLLECTOR_HOST
+  #     - OTEL_COLLECTOR_PORT_GRPC
+  #     - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=low
+  #     - OTEL_SERVICE_NAME=image-provider
+  #   depends_on:
+  #     otel-collector:
+  #       condition: service_started
+  #   logging: *logging
 
   # Load Generator
   load-generator:
@@ -368,34 +364,34 @@ services:
     logging: *logging
 
   # Payment service
-  payment:
-    image: ${IMAGE_NAME}:${DEMO_VERSION}-payment
-    container_name: payment
-    build:
-      context: ./
-      dockerfile: ${PAYMENT_DOCKERFILE}
-      cache_from:
-        - ${IMAGE_NAME}:${IMAGE_VERSION}-payment
-    deploy:
-      resources:
-        limits:
-          memory: 140M
-    restart: unless-stopped
-    ports:
-      - "${PAYMENT_PORT}"
-    environment:
-      - IPV6_ENABLED
-      - FLAGD_HOST
-      - FLAGD_PORT
-      - PAYMENT_PORT
-      - OTEL_EXPORTER_OTLP_ENDPOINT
-      - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
-      - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=critical
-      - OTEL_SERVICE_NAME=payment
-    depends_on:
-      otel-collector:
-        condition: service_started
-    logging: *logging
+  # payment:
+  #   image: ${IMAGE_NAME}:${DEMO_VERSION}-payment
+  #   container_name: payment
+  #   build:
+  #     context: ./
+  #     dockerfile: ${PAYMENT_DOCKERFILE}
+  #     cache_from:
+  #       - ${IMAGE_NAME}:${IMAGE_VERSION}-payment
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 140M
+  #   restart: unless-stopped
+  #   ports:
+  #     - "${PAYMENT_PORT}"
+  #   environment:
+  #     - IPV6_ENABLED
+  #     - FLAGD_HOST
+  #     - FLAGD_PORT
+  #     - PAYMENT_PORT
+  #     - OTEL_EXPORTER_OTLP_ENDPOINT
+  #     - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
+  #     - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=critical
+  #     - OTEL_SERVICE_NAME=payment
+  #   depends_on:
+  #     otel-collector:
+  #       condition: service_started
+  #   logging: *logging
 
   # Product Catalog service
   product-catalog:
