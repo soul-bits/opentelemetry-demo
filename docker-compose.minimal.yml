@@ -373,8 +373,8 @@ services:
     depends_on:
       frontend:
         condition: service_started
-      flagd:
-        condition: service_started
+      # flagd:
+      #   condition: service_started
     logging: *logging
 
   # Payment service
@@ -480,8 +480,8 @@ services:
     depends_on:
       product-catalog:
         condition: service_started
-      llm:
-        condition: service_started
+      # llm:
+      #   condition: service_started
       astronomy-db:
         condition: service_started
       otel-collector:
@@ -591,31 +591,31 @@ services:
   # Dependent Services
   # ******************
   # Flagd, feature flagging service
-  flagd:
-    image: ${FLAGD_IMAGE}
-    container_name: flagd
-    deploy:
-      resources:
-        limits:
-          memory: 75M
-    environment:
-      - FLAGD_OTEL_COLLECTOR_URI=${OTEL_COLLECTOR_HOST}:${OTEL_COLLECTOR_PORT_GRPC}
-      - FLAGD_METRICS_EXPORTER=otel
-      - GOMEMLIMIT=60MiB
-      - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=low
-      - OTEL_SERVICE_NAME=flagd
-    command: [
-      "start",
-      "--uri",
-      "file:./etc/flagd/demo.flagd.json"
-    ]
-    ports:
-      - "${FLAGD_PORT}"
-      - "${FLAGD_OFREP_PORT}"
-    volumes:
-      - ./src/flagd:/etc/flagd
-    logging:
-      *logging
+  # flagd:
+  #   image: ${FLAGD_IMAGE}
+  #   container_name: flagd
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 75M
+  #   environment:
+  #     - FLAGD_OTEL_COLLECTOR_URI=${OTEL_COLLECTOR_HOST}:${OTEL_COLLECTOR_PORT_GRPC}
+  #     - FLAGD_METRICS_EXPORTER=otel
+  #     - GOMEMLIMIT=60MiB
+  #     - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=low
+  #     - OTEL_SERVICE_NAME=flagd
+  #   command: [
+  #     "start",
+  #     "--uri",
+  #     "file:./etc/flagd/demo.flagd.json"
+  #   ]
+  #   ports:
+  #     - "${FLAGD_PORT}"
+  #     - "${FLAGD_OFREP_PORT}"
+  #   volumes:
+  #     - ./src/flagd:/etc/flagd
+  #   logging:
+  #     *logging
 
   # PostgreSQL database for the astronomy demo
   astronomy-db:
@@ -636,25 +636,25 @@ services:
     logging: *logging
 
   # LLM used by Product Review service
-  llm:
-    image: ${IMAGE_NAME}:${DEMO_VERSION}-llm
-    container_name: llm
-    build:
-      context: ./
-      dockerfile: ${LLM_DOCKERFILE}
-      cache_from:
-        - ${IMAGE_NAME}:${IMAGE_VERSION}-llm
-    deploy:
-      resources:
-        limits:
-          memory: 50M
-    restart: unless-stopped
-    environment:
-      - FLAGD_HOST
-      - FLAGD_PORT
-    ports:
-      - "${LLM_PORT}"
-    logging: *logging
+  # llm:
+  #   image: ${IMAGE_NAME}:${DEMO_VERSION}-llm
+  #   container_name: llm
+  #   build:
+  #     context: ./
+  #     dockerfile: ${LLM_DOCKERFILE}
+  #     cache_from:
+  #       - ${IMAGE_NAME}:${IMAGE_VERSION}-llm
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 50M
+  #   restart: unless-stopped
+  #   environment:
+  #     - FLAGD_HOST
+  #     - FLAGD_PORT
+  #   ports:
+  #     - "${LLM_PORT}"
+  #   logging: *logging
 
   # Valkey used by Cart service
   valkey-cart:
