@@ -103,7 +103,7 @@
         "on": true,
         "off": false
       },
-      "defaultVariant": "on"
+      "defaultVariant": "off"
     },
     "loadGeneratorFloodHomepage": {
       "description": "Flood the frontend with a large amount of requests.",
