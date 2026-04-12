@@ -135,9 +135,46 @@ services:
   #   container_name: email
 
   # Frontend
-  # frontend:
-  #   image: ${IMAGE_NAME}:${DEMO_VERSION}-frontend
-  #   container_name: frontend
+  frontend:
+    image: ${IMAGE_NAME}:${DEMO_VERSION}-frontend
+    container_name: frontend
+    deploy:
+      resources:
+        limits:
+          memory: 250M
+    restart: unless-stopped
+    ports:
+      - "${FRONTEND_PORT}"
+    environment:
+      - PORT=${FRONTEND_PORT}
+      - FRONTEND_ADDR
+      - AD_ADDR=
+      - CART_ADDR
+      - CHECKOUT_ADDR
+      - CURRENCY_ADDR=currency:7001
+      - PRODUCT_CATALOG_ADDR
+      - RECOMMENDATION_ADDR
+      - SHIPPING_ADDR=shipping:50050
+      - OTEL_EXPORTER_OTLP_ENDPOINT
+      - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=critical
+      - ENV_PLATFORM
+      - OTEL_SERVICE_NAME=frontend
+      - PUBLIC_OTEL_EXPORTER_OTLP_TRACES_ENDPOINT
+      - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
+      - WEB_OTEL_SERVICE_NAME=frontend-web
+      - OTEL_COLLECTOR_HOST
+    depends_on:
+      cart:
+        condition: service_started
+      checkout:
+        condition: service_started
+      product-catalog:
+        condition: service_started
+      recommendation:
+        condition: service_started
+      otel-collector:
+        condition: service_started
+    logging: *logging
 
   # Frontend Proxy (Envoy)
   # frontend-proxy:
@@ -145,9 +182,33 @@ services:
   #   container_name: frontend-proxy
 
   # Load Generator
-  # load-generator:
-  #   image: ${IMAGE_NAME}:${DEMO_VERSION}-load-generator
-  #   container_name: load-generator
+  load-generator:
+    image: ${IMAGE_NAME}:${DEMO_VERSION}-load-generator
+    container_name: load-generator
+    deploy:
+      resources:
+        limits:
+          memory: 120M
+    restart: unless-stopped
+    ports:
+      - "8089:8089"
+    environment:
+      - LOCUST_WEB_PORT
+      - LOCUST_USERS
+      - LOCUST_HOST
+      - LOCUST_HEADLESS
+      - LOCUST_AUTOSTART
+      - LOCUST_BROWSER_TRAFFIC_ENABLED=false
+      - OTEL_EXPORTER_OTLP_ENDPOINT
+      - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
+      - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=low
+      - OTEL_SERVICE_NAME=load-generator
+      - PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
+      - LOCUST_WEB_HOST=0.0.0.0
+    depends_on:
+      frontend:
+        condition: service_started
+    logging: *logging
 
   # Payment service
   # payment:
