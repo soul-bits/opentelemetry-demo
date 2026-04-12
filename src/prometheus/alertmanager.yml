@@ -1,12 +1,15 @@
+# Copyright The OpenTelemetry Authors
+# SPDX-License-Identifier: Apache-2.0
+
 route:
-  receiver: 'file-logger'
-  group_by: ['alertname', 'service']
+  receiver: 'webhook-receiver'
+  group_by: ['alertname', 'service_name', 'severity']
   group_wait: 10s
   group_interval: 10s
   repeat_interval: 5m
 
 receivers:
-  - name: 'file-logger'
+  - name: 'webhook-receiver'
     webhook_configs:
       - url: 'http://alert-webhook-server:5000/webhook'
         send_resolved: true

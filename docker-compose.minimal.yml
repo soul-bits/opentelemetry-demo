@@ -40,10 +40,18 @@ services:
     working_dir: /app
     volumes:
       - ./src/prometheus/alert-webhook-server.py:/app/alert-webhook-server.py
-      - /tmp:/tmp
+      - ./alerts:/alerts
     command: sh -c "pip install flask -q && python alert-webhook-server.py"
     ports:
       - "5001:5000"
+    environment:
+      - FLASK_ENV=production
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:5000/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
     restart: unless-stopped
     deploy:
       resources:
