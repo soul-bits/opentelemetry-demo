@@ -1,3 +1,4 @@
+
 # Copyright The OpenTelemetry Authors
 # SPDX-License-Identifier: Apache-2.0
 
@@ -17,40 +18,71 @@ services:
   # ******************
   # Core Demo Services
   # ******************
+  # Alertmanager
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: alertmanager
+    volumes:
+      - ./src/prometheus/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+    command:
+      - --config.file=/etc/alertmanager/alertmanager.yml
+    ports:
+      - "9093:9093"
+    restart: unless-stopped
+    logging: *logging
+    depends_on:
+      - alert-webhook-server
 
-  # AdService
-  ad:
-    image: ${IMAGE_NAME}:${DEMO_VERSION}-ad
-    container_name: ad
-    build:
-      context: ./
-      dockerfile: ${AD_DOCKERFILE}
-      cache_from:
-        - ${IMAGE_NAME}:${IMAGE_VERSION}-ad
-      args:
-        OTEL_JAVA_AGENT_VERSION: ${OTEL_JAVA_AGENT_VERSION}
+  # Alert Webhook Server - writes alerts to a file
+  alert-webhook-server:
+    image: python:3.12-slim
+    container_name: alert-webhook-server
+    working_dir: /app
+    volumes:
+      - ./src/prometheus/alert-webhook-server.py:/app/alert-webhook-server.py
+      - /tmp:/tmp
+    command: sh -c "pip install flask -q && python alert-webhook-server.py"
+    ports:
+      - "5001:5000"
+    restart: unless-stopped
     deploy:
       resources:
         limits:
-          memory: 300M
-    restart: unless-stopped
-    ports:
-      - "${AD_PORT}"
-    environment:
-      - AD_PORT
-      - FLAGD_HOST
-      - FLAGD_PORT
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://${OTEL_COLLECTOR_HOST}:${OTEL_COLLECTOR_PORT_HTTP}
-      - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
-      - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=medium
-      - OTEL_LOGS_EXPORTER=otlp
-      - OTEL_SERVICE_NAME=ad
-      # Workaround on OSX for https://bugs.openjdk.org/browse/JDK-8345296
-      - _JAVA_OPTIONS
-    depends_on:
-      otel-collector:
-        condition: service_started
+          memory: 128M
     logging: *logging
+  # AdService
+  # ad:
+  #   image: ${IMAGE_NAME}:${DEMO_VERSION}-ad
+  #   container_name: ad
+  #   build:
+  #     context: ./
+  #     dockerfile: ${AD_DOCKERFILE}
+  #     cache_from:
+  #       - ${IMAGE_NAME}:${IMAGE_VERSION}-ad
+  #     args:
+  #       OTEL_JAVA_AGENT_VERSION: ${OTEL_JAVA_AGENT_VERSION}
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 300M
+  #   restart: unless-stopped
+  #   ports:
+  #     - "${AD_PORT}"
+  #   environment:
+  #     - AD_PORT
+  #     - FLAGD_HOST
+  #     - FLAGD_PORT
+  #     - OTEL_EXPORTER_OTLP_ENDPOINT=http://${OTEL_COLLECTOR_HOST}:${OTEL_COLLECTOR_PORT_HTTP}
+  #     - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
+  #     - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=medium
+  #     - OTEL_LOGS_EXPORTER=otlp
+  #     - OTEL_SERVICE_NAME=ad
+  #     # Workaround on OSX for https://bugs.openjdk.org/browse/JDK-8345296
+  #     - _JAVA_OPTIONS
+  #   depends_on:
+  #     otel-collector:
+  #       condition: service_started
+  #   logging: *logging
 
   # Cart service
   cart:
@@ -89,11 +121,6 @@ services:
   checkout:
     image: ${IMAGE_NAME}:${DEMO_VERSION}-checkout
     container_name: checkout
-    build:
-      context: ./
-      dockerfile: ${CHECKOUT_DOCKERFILE}
-      cache_from:
-        - ${IMAGE_NAME}:${IMAGE_VERSION}-checkout
     deploy:
       resources:
         limits:
@@ -120,10 +147,6 @@ services:
       cart:
         condition: service_started
       currency:
-        condition: service_started
-      email:
-        condition: service_started
-      payment:
         condition: service_started
       product-catalog:
         condition: service_started
@@ -165,33 +188,33 @@ services:
     logging: *logging
 
   # Email service
-  email:
-    image: ${IMAGE_NAME}:${DEMO_VERSION}-email
-    container_name: email
-    build:
-      context: ./src/email
-      cache_from:
-        - ${IMAGE_NAME}:${IMAGE_VERSION}-email
-    deploy:
-      resources:
-        limits:
-          memory: 100M
-    restart: unless-stopped
-    ports:
-      - "${EMAIL_PORT}"
-    environment:
-      - APP_ENV=production
-      - EMAIL_PORT
-      - FLAGD_HOST
-      - FLAGD_PORT
-      - OTEL_EXPORTER_OTLP_ENDPOINT=http://${OTEL_COLLECTOR_HOST}:${OTEL_COLLECTOR_PORT_HTTP}
-      - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
-      - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=medium
-      - OTEL_SERVICE_NAME=email
-    depends_on:
-      otel-collector:
-        condition: service_started
-    logging: *logging
+  # email:
+  #   image: ${IMAGE_NAME}:${DEMO_VERSION}-email
+  #   container_name: email
+  #   build:
+  #     context: ./src/email
+  #     cache_from:
+  #       - ${IMAGE_NAME}:${IMAGE_VERSION}-email
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 100M
+  #   restart: unless-stopped
+  #   ports:
+  #     - "${EMAIL_PORT}"
+  #   environment:
+  #     - APP_ENV=production
+  #     - EMAIL_PORT
+  #     - FLAGD_HOST
+  #     - FLAGD_PORT
+  #     - OTEL_EXPORTER_OTLP_ENDPOINT=http://${OTEL_COLLECTOR_HOST}:${OTEL_COLLECTOR_PORT_HTTP}
+  #     - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
+  #     - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=medium
+  #     - OTEL_SERVICE_NAME=email
+  #   depends_on:
+  #     otel-collector:
+  #       condition: service_started
+  #   logging: *logging
 
   # Frontend
   frontend:
@@ -230,8 +253,8 @@ services:
       - FLAGD_HOST
       - FLAGD_PORT
     depends_on:
-      ad:
-        condition: service_started
+      # ad:
+      #   condition: service_started
       cart:
         condition: service_started
       checkout:
@@ -248,8 +271,8 @@ services:
         condition: service_started
       otel-collector:
         condition: service_started
-      image-provider:
-        condition: service_started
+      # image-provider:
+      #   condition: service_started
     logging: *logging
 
   # Frontend Proxy (Envoy)
@@ -265,8 +288,8 @@ services:
           memory: 65M
     restart: unless-stopped
     ports:
-      - "${ENVOY_PORT}:${ENVOY_PORT}"
-      - "${ENVOY_ADMIN_PORT}:${ENVOY_ADMIN_PORT}"
+      - "80:8080"
+      - "10000:10000"
     environment:
       - FRONTEND_PORT
       - FRONTEND_HOST
@@ -300,33 +323,35 @@ services:
       grafana:
         condition: service_started
     dns_search: ""
+    networks:
+      - default
 
   # image-provider
-  image-provider:
-    image: ${IMAGE_NAME}:${DEMO_VERSION}-image-provider
-    container_name: image-provider
-    build:
-      context: ./
-      dockerfile: ${IMAGE_PROVIDER_DOCKERFILE}
-      cache_from:
-        - ${IMAGE_NAME}:${IMAGE_VERSION}-image-provider
-    deploy:
-      resources:
-        limits:
-          memory: 120M
-    restart: unless-stopped
-    ports:
-      - "${IMAGE_PROVIDER_PORT}"
-    environment:
-      - IMAGE_PROVIDER_PORT
-      - OTEL_COLLECTOR_HOST
-      - OTEL_COLLECTOR_PORT_GRPC
-      - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=low
-      - OTEL_SERVICE_NAME=image-provider
-    depends_on:
-      otel-collector:
-        condition: service_started
-    logging: *logging
+  # image-provider:
+  #   image: ${IMAGE_NAME}:${DEMO_VERSION}-image-provider
+  #   container_name: image-provider
+  #   build:
+  #     context: ./
+  #     dockerfile: ${IMAGE_PROVIDER_DOCKERFILE}
+  #     cache_from:
+  #       - ${IMAGE_NAME}:${IMAGE_VERSION}-image-provider
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 120M
+  #   restart: unless-stopped
+  #   ports:
+  #     - "${IMAGE_PROVIDER_PORT}"
+  #   environment:
+  #     - IMAGE_PROVIDER_PORT
+  #     - OTEL_COLLECTOR_HOST
+  #     - OTEL_COLLECTOR_PORT_GRPC
+  #     - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=low
+  #     - OTEL_SERVICE_NAME=image-provider
+  #   depends_on:
+  #     otel-collector:
+  #       condition: service_started
+  #   logging: *logging
 
   # Load Generator
   load-generator:
@@ -343,7 +368,7 @@ services:
           memory: 120M
     restart: unless-stopped
     ports:
-      - "${LOCUST_WEB_PORT}"
+      - "8089:8089"
     environment:
       - LOCUST_WEB_PORT
       - LOCUST_USERS
@@ -363,39 +388,39 @@ services:
     depends_on:
       frontend:
         condition: service_started
-      flagd:
-        condition: service_started
+      # flagd:
+      #   condition: service_started
     logging: *logging
 
   # Payment service
-  payment:
-    image: ${IMAGE_NAME}:${DEMO_VERSION}-payment
-    container_name: payment
-    build:
-      context: ./
-      dockerfile: ${PAYMENT_DOCKERFILE}
-      cache_from:
-        - ${IMAGE_NAME}:${IMAGE_VERSION}-payment
-    deploy:
-      resources:
-        limits:
-          memory: 140M
-    restart: unless-stopped
-    ports:
-      - "${PAYMENT_PORT}"
-    environment:
-      - IPV6_ENABLED
-      - FLAGD_HOST
-      - FLAGD_PORT
-      - PAYMENT_PORT
-      - OTEL_EXPORTER_OTLP_ENDPOINT
-      - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
-      - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=critical
-      - OTEL_SERVICE_NAME=payment
-    depends_on:
-      otel-collector:
-        condition: service_started
-    logging: *logging
+  # payment:
+  #   image: ${IMAGE_NAME}:${DEMO_VERSION}-payment
+  #   container_name: payment
+  #   build:
+  #     context: ./
+  #     dockerfile: ${PAYMENT_DOCKERFILE}
+  #     cache_from:
+  #       - ${IMAGE_NAME}:${IMAGE_VERSION}-payment
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 140M
+  #   restart: unless-stopped
+  #   ports:
+  #     - "${PAYMENT_PORT}"
+  #   environment:
+  #     - IPV6_ENABLED
+  #     - FLAGD_HOST
+  #     - FLAGD_PORT
+  #     - PAYMENT_PORT
+  #     - OTEL_EXPORTER_OTLP_ENDPOINT
+  #     - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
+  #     - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=critical
+  #     - OTEL_SERVICE_NAME=payment
+  #   depends_on:
+  #     otel-collector:
+  #       condition: service_started
+  #   logging: *logging
 
   # Product Catalog service
   product-catalog:
@@ -470,8 +495,8 @@ services:
     depends_on:
       product-catalog:
         condition: service_started
-      llm:
-        condition: service_started
+      # llm:
+      #   condition: service_started
       astronomy-db:
         condition: service_started
       otel-collector:
@@ -566,12 +591,6 @@ services:
       - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=high
       - OTEL_SERVICE_NAME=shipping
       - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
-    healthcheck:
-      test: ["CMD-SHELL", "timeout 1 bash -c '>/dev/tcp/localhost/${SHIPPING_PORT}'"]
-      start_period: 10s
-      interval: 5s
-      timeout: 10s
-      retries: 10
     depends_on:
       otel-collector:
         condition: service_started
@@ -581,31 +600,31 @@ services:
   # Dependent Services
   # ******************
   # Flagd, feature flagging service
-  flagd:
-    image: ${FLAGD_IMAGE}
-    container_name: flagd
-    deploy:
-      resources:
-        limits:
-          memory: 75M
-    environment:
-      - FLAGD_OTEL_COLLECTOR_URI=${OTEL_COLLECTOR_HOST}:${OTEL_COLLECTOR_PORT_GRPC}
-      - FLAGD_METRICS_EXPORTER=otel
-      - GOMEMLIMIT=60MiB
-      - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=low
-      - OTEL_SERVICE_NAME=flagd
-    command: [
-      "start",
-      "--uri",
-      "file:./etc/flagd/demo.flagd.json"
-    ]
-    ports:
-      - "${FLAGD_PORT}"
-      - "${FLAGD_OFREP_PORT}"
-    volumes:
-      - ./src/flagd:/etc/flagd
-    logging:
-      *logging
+  # flagd:
+  #   image: ${FLAGD_IMAGE}
+  #   container_name: flagd
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 75M
+  #   environment:
+  #     - FLAGD_OTEL_COLLECTOR_URI=${OTEL_COLLECTOR_HOST}:${OTEL_COLLECTOR_PORT_GRPC}
+  #     - FLAGD_METRICS_EXPORTER=otel
+  #     - GOMEMLIMIT=60MiB
+  #     - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=low
+  #     - OTEL_SERVICE_NAME=flagd
+  #   command: [
+  #     "start",
+  #     "--uri",
+  #     "file:./etc/flagd/demo.flagd.json"
+  #   ]
+  #   ports:
+  #     - "${FLAGD_PORT}"
+  #     - "${FLAGD_OFREP_PORT}"
+  #   volumes:
+  #     - ./src/flagd:/etc/flagd
+  #   logging:
+  #     *logging
 
   # PostgreSQL database for the astronomy demo
   astronomy-db:
@@ -626,25 +645,25 @@ services:
     logging: *logging
 
   # LLM used by Product Review service
-  llm:
-    image: ${IMAGE_NAME}:${DEMO_VERSION}-llm
-    container_name: llm
-    build:
-      context: ./
-      dockerfile: ${LLM_DOCKERFILE}
-      cache_from:
-        - ${IMAGE_NAME}:${IMAGE_VERSION}-llm
-    deploy:
-      resources:
-        limits:
-          memory: 50M
-    restart: unless-stopped
-    environment:
-      - FLAGD_HOST
-      - FLAGD_PORT
-    ports:
-      - "${LLM_PORT}"
-    logging: *logging
+  # llm:
+  #   image: ${IMAGE_NAME}:${DEMO_VERSION}-llm
+  #   container_name: llm
+  #   build:
+  #     context: ./
+  #     dockerfile: ${LLM_DOCKERFILE}
+  #     cache_from:
+  #       - ${IMAGE_NAME}:${IMAGE_VERSION}-llm
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 50M
+  #   restart: unless-stopped
+  #   environment:
+  #     - FLAGD_HOST
+  #     - FLAGD_PORT
+  #   ports:
+  #     - "${LLM_PORT}"
+  #   logging: *logging
 
   # Valkey used by Cart service
   valkey-cart:
@@ -676,8 +695,8 @@ services:
           memory: 400M
     restart: unless-stopped
     ports:
-      - "${JAEGER_UI_PORT}"
-      - "${JAEGER_GRPC_PORT}"
+      - "16686:16686"
+      - "4317:4317"
     environment:
       - JAEGER_HOST
       - JAEGER_GRPC_PORT
@@ -704,7 +723,7 @@ services:
       - ./src/grafana/grafana.ini:/etc/grafana/grafana.ini
       - ./src/grafana/provisioning/:/etc/grafana/provisioning/
     ports:
-      - "${GRAFANA_PORT}"
+      - "3000:3000"
     logging: *logging
 
   # OpenTelemetry Collector
@@ -763,13 +782,15 @@ services:
       - --enable-feature=exemplar-storage
     volumes:
       - ./src/prometheus/prometheus-config.yaml:/etc/prometheus/prometheus-config.yaml
+      - ./src/prometheus/alert-rules.yml:/etc/prometheus/alert-rules.yml
+      - ./src/prometheus/alertmanager.yml:/etc/prometheus/alertmanager.yaml
     deploy:
       resources:
         limits:
           memory: 200M
     restart: unless-stopped
     ports:
-      - "${PROMETHEUS_PORT}:${PROMETHEUS_PORT}"
+      - "9090:9090"
     logging: *logging
 
   # OpenSearch
