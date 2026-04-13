@@ -2,14 +2,14 @@
 # SPDX-License-Identifier: Apache-2.0
 
 route:
-  receiver: 'webhook-receiver'
+  receiver: 'rca-agent'
   group_by: ['alertname', 'service_name', 'severity']
   group_wait: 10s
   group_interval: 10s
   repeat_interval: 5m
 
 receivers:
-  - name: 'webhook-receiver'
+  - name: 'rca-agent'
     webhook_configs:
-      - url: 'http://alert-webhook-server:5000/webhook'
+      - url: 'http://host.docker.internal:5002/webhook'
         send_resolved: true

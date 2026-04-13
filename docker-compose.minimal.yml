@@ -30,33 +30,33 @@ services:
       - "9093:9093"
     restart: unless-stopped
     logging: *logging
-    depends_on:
-      - alert-webhook-server
-  alert-webhook-server:
-    image: python:3.12-slim
-    container_name: alert-webhook-server
-    working_dir: /app
-    volumes:
-      - ./src/prometheus/alert-webhook-server.py:/app/alert-webhook-server.py
-      - /tmp:/tmp
-      - ./alerts:/alerts
-    command: sh -c "pip install flask -q && python alert-webhook-server.py"
-    ports:
-      - "5001:5000"
-    environment:
-      - FLASK_ENV=production
-    healthcheck:
-      test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-      start_period: 5s
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 128M
-    logging: *logging
+  #   depends_on:
+  #     - alert-webhook-server
+  # alert-webhook-server:
+  #   image: python:3.12-slim
+  #   container_name: alert-webhook-server
+  #   working_dir: /app
+  #   volumes:
+  #     - ./src/prometheus/alert-webhook-server.py:/app/alert-webhook-server.py
+  #     - /tmp:/tmp
+  #     - ./alerts:/alerts
+  #   command: sh -c "pip install flask -q && python alert-webhook-server.py"
+  #   ports:
+  #     - "5001:5000"
+  #   environment:
+  #     - FLASK_ENV=production
+  #   healthcheck:
+  #     test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 3
+  #     start_period: 5s
+  #   restart: unless-stopped
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 128M
+  #   logging: *logging
   # AdService
   # ad:
   #   image: ${IMAGE_NAME}:${DEMO_VERSION}-ad
