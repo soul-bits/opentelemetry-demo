@@ -30,26 +30,33 @@ services:
       - "9093:9093"
     restart: unless-stopped
     logging: *logging
-    depends_on:
-      - alert-webhook-server
-
-  # Alert Webhook Server - writes alerts to a file
-  alert-webhook-server:
-    image: python:3.12-slim
-    container_name: alert-webhook-server
-    working_dir: /app
-    volumes:
-      - ./src/prometheus/alert-webhook-server.py:/app/alert-webhook-server.py
-      - /tmp:/tmp
-    command: sh -c "pip install flask -q && python alert-webhook-server.py"
-    ports:
-      - "5001:5000"
-    restart: unless-stopped
-    deploy:
-      resources:
-        limits:
-          memory: 128M
-    logging: *logging
+  #   depends_on:
+  #     - alert-webhook-server
+  # alert-webhook-server:
+  #   image: python:3.12-slim
+  #   container_name: alert-webhook-server
+  #   working_dir: /app
+  #   volumes:
+  #     - ./src/prometheus/alert-webhook-server.py:/app/alert-webhook-server.py
+  #     - /tmp:/tmp
+  #     - ./alerts:/alerts
+  #   command: sh -c "pip install flask -q && python alert-webhook-server.py"
+  #   ports:
+  #     - "5001:5000"
+  #   environment:
+  #     - FLASK_ENV=production
+  #   healthcheck:
+  #     test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 3
+  #     start_period: 5s
+  #   restart: unless-stopped
+  #   deploy:
+  #     resources:
+  #       limits:
+  #         memory: 128M
+  #   logging: *logging
   # AdService
   # ad:
   #   image: ${IMAGE_NAME}:${DEMO_VERSION}-ad
@@ -115,6 +122,8 @@ services:
         condition: service_started
       otel-collector:
         condition: service_started
+      flagd:
+        condition: service_started
     logging: *logging
 
   # Checkout service
@@ -153,6 +162,8 @@ services:
       shipping:
         condition: service_started
       otel-collector:
+        condition: service_started
+      flagd:
         condition: service_started
     logging: *logging
 
@@ -388,8 +399,8 @@ services:
     depends_on:
       frontend:
         condition: service_started
-      # flagd:
-      #   condition: service_started
+      flagd:
+        condition: service_started
     logging: *logging
 
   # Payment service
@@ -455,6 +466,8 @@ services:
       otel-collector:
         condition: service_started
       astronomy-db:
+        condition: service_started
+      flagd:
         condition: service_started
     volumes:
       - ./otel-config.yml:/otel-config.yml
@@ -565,6 +578,8 @@ services:
         condition: service_started
       otel-collector:
         condition: service_started
+      flagd:
+        condition: service_started
     logging: *logging
 
   # Shipping service
@@ -599,32 +614,42 @@ services:
   # ******************
   # Dependent Services
   # ******************
-  # Flagd, feature flagging service
-  # flagd:
-  #   image: ${FLAGD_IMAGE}
-  #   container_name: flagd
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         memory: 75M
-  #   environment:
-  #     - FLAGD_OTEL_COLLECTOR_URI=${OTEL_COLLECTOR_HOST}:${OTEL_COLLECTOR_PORT_GRPC}
-  #     - FLAGD_METRICS_EXPORTER=otel
-  #     - GOMEMLIMIT=60MiB
-  #     - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=low
-  #     - OTEL_SERVICE_NAME=flagd
-  #   command: [
-  #     "start",
-  #     "--uri",
-  #     "file:./etc/flagd/demo.flagd.json"
-  #   ]
-  #   ports:
-  #     - "${FLAGD_PORT}"
-  #     - "${FLAGD_OFREP_PORT}"
-  #   volumes:
-  #     - ./src/flagd:/etc/flagd
-  #   logging:
-  #     *logging
+
+  # Flagd - feature flag service for chaos injection
+  #
+  # RCA Demo Scenarios (edit src/flagd/demo.flagd.json, set defaultVariant to "on"):
+  #   productCatalogFailure  → product-catalog errors  → fires: HighRPCErrorRate on product-catalog
+  #   cartFailure            → cart errors             → fires: HighRPCErrorRate on cart
+  #   recommendationCacheFailure → recommendation errors → fires: HighRPCErrorRate on recommendation
+  #   paymentFailure         → checkout payment fails  → fires: HighHTTPErrorRate on checkout
+  #
+  flagd:
+    image: ${FLAGD_IMAGE}
+    container_name: flagd
+    deploy:
+      resources:
+        limits:
+          memory: 75M
+    environment:
+      - FLAGD_OTEL_COLLECTOR_URI=${OTEL_COLLECTOR_HOST}:${OTEL_COLLECTOR_PORT_GRPC}
+      - FLAGD_METRICS_EXPORTER=otel
+      - GOMEMLIMIT=60MiB
+      - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=low
+      - OTEL_SERVICE_NAME=flagd
+    command: [
+      "start",
+      "--uri",
+      "file:./etc/flagd/demo.flagd.json"
+    ]
+    ports:
+      - "${FLAGD_PORT}"
+      - "${FLAGD_OFREP_PORT}"
+    volumes:
+      - ./src/flagd:/etc/flagd
+    depends_on:
+      otel-collector:
+        condition: service_started
+    logging: *logging
 
   # PostgreSQL database for the astronomy demo
   astronomy-db:

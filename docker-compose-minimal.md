@@ -4,78 +4,81 @@
 
 ```mermaid
 graph TB
-    LG["🔄 Load Generator"]
-    FP["🌐 Envoy Proxy"]
+    LG["🔄 Load Generator<br/>Locust :8089"]
+    FP["🌐 Envoy Proxy<br/>:80"]
     FE["🏠 Frontend<br/>Node.js"]
-    
+    FLAGD["🚩 flagd<br/>:8013"]
+
     subgraph "Services"
-        S1["🛒 Checkout"]
-        S2["🛍️ Cart"]
-        S3["📦 Shipping"]
-        S4["📚 Product Catalog"]
-        S5["⭐ Product Reviews"]
-        S6["🎯 Recommendation"]
+        S1["🛒 Checkout<br/>Go :5050"]
+        S2["🛍️ Cart<br/>.NET :7070"]
+        S3["📦 Shipping<br/>Go :50050"]
+        S4["📚 Product Catalog<br/>Go :3550"]
+        S5["⭐ Product Reviews<br/>Python :3551"]
+        S6["🎯 Recommendation<br/>Python :9001"]
+        S7["💱 Currency<br/>C++ :7001"]
+        S8["💬 Quote<br/>PHP :8090"]
     end
-    
+
     subgraph "Data"
-        DB["🐘 PostgreSQL"]
-        CACHE["💾 Redis"]
+        DB["🐘 PostgreSQL<br/>astronomy_db"]
+        CACHE["💾 Valkey<br/>:6379"]
     end
-    
+
     subgraph "Telemetry Stack"
         OTEL["OTel Collector"]
         PROM["📊 Prometheus<br/>:9090"]
         JAEG["🔍 Jaeger<br/>:16686"]
-        OS["🔎 OpenSearch"]
+        OS["🔎 OpenSearch<br/>:9200"]
     end
-    
+
     subgraph "Alerting"
         AM["🚨 Alertmanager<br/>:9093"]
-        WH["🔔 Webhook<br/>:5001"]
-        LOG["/tmp/alerts.log"]
+        WH["🔔 Webhook Server<br/>:5001"]
     end
-    
+
     GRAF["📈 Grafana<br/>:3000"]
-    
+
     %% Request flow
     LG -->|HTTP| FP
     FP --> FE
-    FE --> S1 & S2 & S3 & S4 & S5 & S6
-    
-    %% Data flow
-    S1 & S2 & S3 & S4 & S5 --> DB
+    FE --> S1 & S2 & S4 & S6 & S7
+    S1 --> S2 & S4 & S3 & S7
+    S3 --> S8
+    S6 --> S4
+
+    %% Feature flags
+    FLAGD -.->|flags| S1 & S2 & S4 & S6
+
+    %% Data layer
+    S4 --> DB
+    S5 --> DB
     S2 --> CACHE
-    
-    %% Telemetry (dotted = signals)
-    FE -.-> OTEL
-    S1 -.-> OTEL
-    S2 -.-> OTEL
-    S3 -.-> OTEL
-    S4 -.-> OTEL
-    OTEL --> PROM
-    OTEL --> JAEG
-    OTEL --> OS
-    
+
+    %% Telemetry signals
+    FE & S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 -.->|OTLP| OTEL
+    OTEL --> PROM & JAEG & OS
+
     %% Alerting flow
-    PROM --> AM
-    AM --> WH
-    WH --> LOG
-    
+    PROM -->|rules eval| AM
+    AM -->|webhook| WH
+    WH -->|RCA agent hooks here| WH
+
     %% Visualization
-    GRAF -->|Query| PROM
-    GRAF -->|Query| JAEG
-    GRAF -->|Query| OS
-    
+    GRAF -->|query| PROM & JAEG & OS
+
     %% Styling
     classDef service fill:#4A90E2,stroke:#2E5C8A,color:#fff
     classDef telemetry fill:#FFB819,stroke:#B8860B,color:#000
     classDef alert fill:#E74C3C,stroke:#A93226,color:#fff
     classDef viz fill:#9B59B6,stroke:#6C3483,color:#fff
-    
-    class S1,S2,S3,S4,S5,S6 service
+    classDef flag fill:#27AE60,stroke:#1E8449,color:#fff
+
+    class S1,S2,S3,S4,S5,S6,S7,S8 service
     class OTEL,PROM,JAEG,OS telemetry
-    class AM,WH,LOG alert
+    class AM,WH alert
     class GRAF viz
+    class FLAGD flag
 ```
 
 ## Quick Start
