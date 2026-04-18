@@ -30,67 +30,7 @@ services:
       - "9093:9093"
     restart: unless-stopped
     logging: *logging
-  #   depends_on:
-  #     - alert-webhook-server
-  # alert-webhook-server:
-  #   image: python:3.12-slim
-  #   container_name: alert-webhook-server
-  #   working_dir: /app
-  #   volumes:
-  #     - ./src/prometheus/alert-webhook-server.py:/app/alert-webhook-server.py
-  #     - /tmp:/tmp
-  #     - ./alerts:/alerts
-  #   command: sh -c "pip install flask -q && python alert-webhook-server.py"
-  #   ports:
-  #     - "5001:5000"
-  #   environment:
-  #     - FLASK_ENV=production
-  #   healthcheck:
-  #     test: ["CMD", "python3", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:5000/health')"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 3
-  #     start_period: 5s
-  #   restart: unless-stopped
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         memory: 128M
-  #   logging: *logging
-  # AdService
-  # ad:
-  #   image: ${IMAGE_NAME}:${DEMO_VERSION}-ad
-  #   container_name: ad
-  #   build:
-  #     context: ./
-  #     dockerfile: ${AD_DOCKERFILE}
-  #     cache_from:
-  #       - ${IMAGE_NAME}:${IMAGE_VERSION}-ad
-  #     args:
-  #       OTEL_JAVA_AGENT_VERSION: ${OTEL_JAVA_AGENT_VERSION}
-  #   deploy:
-  #     resources:
-  #       limits:
-  #         memory: 300M
-  #   restart: unless-stopped
-  #   ports:
-  #     - "${AD_PORT}"
-  #   environment:
-  #     - AD_PORT
-  #     - FLAGD_HOST
-  #     - FLAGD_PORT
-  #     - OTEL_EXPORTER_OTLP_ENDPOINT=http://${OTEL_COLLECTOR_HOST}:${OTEL_COLLECTOR_PORT_HTTP}
-  #     - OTEL_EXPORTER_OTLP_METRICS_TEMPORALITY_PREFERENCE
-  #     - OTEL_RESOURCE_ATTRIBUTES=${OTEL_RESOURCE_ATTRIBUTES},service.criticality=medium
-  #     - OTEL_LOGS_EXPORTER=otlp
-  #     - OTEL_SERVICE_NAME=ad
-  #     # Workaround on OSX for https://bugs.openjdk.org/browse/JDK-8345296
-  #     - _JAVA_OPTIONS
-  #   depends_on:
-  #     otel-collector:
-  #       condition: service_started
-  #   logging: *logging
-
+    
   # Cart service
   cart:
     image: ${IMAGE_NAME}:${DEMO_VERSION}-cart

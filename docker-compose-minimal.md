@@ -18,7 +18,7 @@ graph TB
         S6["🎯 Recommendation<br/>Python :9001"]
         S7["💱 Currency<br/>C++ :7001"]
         S8["💬 Quote<br/>PHP :8090"]
-        S9["💳 Payment<br/>Go :8080"]
+        S9["💳 Payment<br/>Go :50051"]
     end
 
     subgraph "Data"
@@ -35,23 +35,22 @@ graph TB
 
     subgraph "Alerting"
         AM["🚨 Alertmanager<br/>:9093"]
-        WH["🔔 Webhook Server<br/>:5001"]
+        WH["🔔 Webhook Server<br/>:5001 ⚠️ commented out"]
     end
 
     GRAF["📈 Grafana<br/>:3000"]
 
     %% Request flow
     LG -->|HTTP| FP
-    FP --> FE
-    FE --> S1 & S2 & S4 & S6 & S7
+    FP --> FE & S5
+    FE --> S1 & S2 & S3 & S4 & S6 & S7
     S1 --> S2 & S4 & S3 & S7 & S9
     S3 --> S8
     S6 --> S4
     S5 --> S4
 
     %% Feature flags
-    FLAGD -.->|flags| S1 & S2 & S4 & S6 & S9
-    LG -.->|depends on| FLAGD
+    FLAGD -.->|flags| LG & FE & FP & S1 & S2 & S4 & S6 & S9
 
     %% Data layer
     S4 --> DB
@@ -59,13 +58,13 @@ graph TB
     S2 --> CACHE
 
     %% Telemetry signals
-    FE & S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & S9 -.->|OTLP| OTEL
+    FP & FE & LG & S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & S9 -.->|OTLP| OTEL
     FLAGD -.->|metrics| OTEL
     OTEL --> PROM & JAEG & OS
 
     %% Alerting flow
     PROM -->|rules eval| AM
-    AM -->|webhook| WH
+    AM -.->|webhook ⚠️ inactive| WH
 
     %% Visualization
     GRAF -->|query| PROM & JAEG & OS
@@ -77,7 +76,7 @@ graph TB
     classDef viz fill:#9B59B6,stroke:#6C3483,color:#fff
     classDef flag fill:#27AE60,stroke:#1E8449,color:#fff
 
-    class S1,S2,S3,S4,S5,S6,S7,S8 service
+    class S1,S2,S3,S4,S5,S6,S7,S8,S9 service
     class OTEL,PROM,JAEG,OS telemetry
     class AM,WH alert
     class GRAF viz
@@ -100,14 +99,13 @@ docker compose -f docker-compose.minimal.yml up -d
 | **Alertmanager** | http://localhost:9093 | Alert Management |
 | **Jaeger** | http://localhost:16686 | Distributed Tracing |
 | **Frontend** | http://localhost:80 | Application UI |
-| **Webhook Server** | http://localhost:5001/health | Alert Receiver |
+| **Locust UI** | http://localhost:8089 | Load Generator Control |
+| **OpenSearch** | http://localhost:9200 | Log Storage & Search |
+| **Webhook Server** | http://localhost:5001/health | Alert Receiver (commented out in compose) |
 
 ### Monitor Alerts
 ```bash
-# Watch alerts in real-time
-tail -f /tmp/alerts.log
-
-# Or query Alertmanager
+# Query Alertmanager directly (alert-webhook-server is commented out; /tmp/alerts.log is not written)
 curl -s http://localhost:9093/api/v1/alerts | jq .
 ```
 
@@ -120,7 +118,7 @@ curl -s http://localhost:9090/api/v1/rules | jq '.data.groups[0].rules[] | {name
 curl -s http://localhost:9090/api/v1/query?query='up' | jq '.data.result | length'
 ```
 
-## Services (9 Microservices)
+## Services (10 Microservices)
 
 | Service | Language | Type | Port |
 |---------|----------|------|------|
@@ -128,16 +126,19 @@ curl -s http://localhost:9090/api/v1/query?query='up' | jq '.data.result | lengt
 | Checkout | Go | gRPC | 5050 |
 | Cart | .NET | gRPC | 7070 |
 | Currency | C++ | gRPC | 7001 |
+| Payment | Go | gRPC | 50051 |
 | Shipping | Go | gRPC | 50050 |
 | Quote | PHP | HTTP | 8090 |
 | Product Catalog | Go | gRPC | 3550 |
 | Product Reviews | Python | HTTP | 3551 |
 | Recommendation | Python | HTTP | 9001 |
 
+> **Note:** `product-reviews` requires `LLM_BASE_URL` and `OPENAI_API_KEY` env vars to function fully. The `alert-webhook-server` is currently commented out in `docker-compose.minimal.yml` — uncomment to enable the RCA agent webhook endpoint at `:5001`.
+
 ## Observability Components
 
 ### Metrics (Prometheus)
-- ✅ Scrapes all 9 services
+- ✅ Scrapes all 10 services
 - ✅ 10 production alert rules
 - ✅ HTTP error rates, latency thresholds, DB saturation
 - ✅ Evaluation interval: 30 seconds
@@ -158,7 +159,7 @@ curl -s http://localhost:9090/api/v1/query?query='up' | jq '.data.result | lengt
 - ✅ Latency spike detection (HTTP, RPC, DB)
 - ✅ Connection pool saturation
 - ✅ OTel Collector health monitoring
-- ✅ Webhook routing to `/tmp/alerts.log`
+- ❌ Webhook routing to `/tmp/alerts.log` (alert-webhook-server commented out)
 
 ## Alert Rules
 
@@ -214,23 +215,30 @@ All alert rules use **real metrics** extracted from Grafana dashboards:
 4. **Services** → Process requests, emit telemetry signals
 5. **OTel Collector** → Aggregates metrics, traces, logs
 6. **Prometheus** → Evaluates alert rules every 30 seconds
-7. **Alertmanager** → Routes alerts via webhook
-8. **Flask Webhook** → Writes alerts to `/tmp/alerts.log`
+7. **Alertmanager** → Routes alerts via webhook _(alert-webhook-server is currently commented out — step 8 is inactive)_
+8. **Flask Webhook** → Would write alerts to `/tmp/alerts.log` for agent consumption
 9. **Observability Agent** → Consumes alerts for incident triage
 
 ## Key Files
 
 - **docker-compose.minimal.yml** - Main orchestration file
+- **src/flagd/demo.flagd.json** - Feature flag config; edit to inject chaos (hot-reloaded, no restart needed)
 - **src/prometheus/alert-rules.yml** - 10 production alert rules
-- **src/prometheus/alert-webhook-server.py** - Flask webhook receiver
+- **src/prometheus/alert-webhook-server.py** - Flask webhook receiver (currently commented out)
 - **src/prometheus/alertmanager.yml** - Alert routing configuration
 - **src/prometheus/prometheus-config.yaml** - Metrics scrape config
+- **src/otel-collector/otelcol-config.yml** - OTel Collector pipeline (receivers, processors, exporters)
+- **src/otel-collector/otelcol-config-extras.yml** - OTel Collector overrides/extensions
+- **otel-config.yml** - OTel SDK config mounted into product-catalog
+- **src/jaeger/config.yml** - Jaeger storage and sampling configuration
+- **src/grafana/grafana.ini** + **src/grafana/provisioning/** - Grafana config and datasource/dashboard provisioning
+- **src/postgresql/init.sql** - astronomy_db schema initialization
 - **.env** - Environment variables (ports, addresses, credentials)
 
 ## Notes
 
-- All services use pre-built images (no local builds in minimal stack)
-- Healthchecks disabled for fast startup
-- Alert webhook writes to `/tmp/alerts.log` for agent consumption
-- Prometheus scrapes metrics on port 9090 (internal)
+- Most services have a `build:` block (Dockerfile + `cache_from`) — Docker will use the pre-built image if available, or build locally on first run. Exception: `checkout` has no build section and always uses the pre-built image.
+- Healthchecks disabled for fast startup (except `opensearch`, which must be healthy before `otel-collector` starts)
+- `alert-webhook-server` is commented out — uncomment to enable alert webhook at `:5001` for the RCA agent
+- Prometheus scrapes metrics; port 9090 is externally accessible (mapped `9090:9090`)
 - All dashboards available in Grafana at http://localhost:3000

@@ -1,0 +1,2190 @@
+# Service map for the OpenTelemetry demo stack.
+# Swap this file (or set SERVICE_MAP_PATH env var) to adapt to another system.
+#
+# Topology fields:
+#   protocol: http | grpc
+#   port: primary port
+#   language: runtime language
+#   depends_on: list of upstream services this service calls
+#
+# Observability capabilities (scanned from live Prometheus — regenerate with scripts/scan_capabilities.py):
+#   metrics: list of metric families available in Prometheus for this service
+#     name:         metric base name (histogram families listed without _bucket/_count/_sum suffix)
+#     type:         histogram | counter | gauge
+#     category:     golden_signal | custom | runtime | system | meta
+#                   golden_signal = latency/error rate, use first for RCA
+#                   custom = app-specific business metrics
+#                   runtime = language runtime internals (GC, threads, memory)
+#                   system = OS-level (CPU, disk, network)
+#                   meta = OTel SDK internals, target_info
+#     label_keys:   all label dimensions present on this metric (excluding internal labels:
+#                   instance, host_name, job, service_instance_id, service_namespace,
+#                   service_version, service_criticality)
+#     label_values: distinct observed values for dimensions useful for filtering
+#                   (omitted for high-cardinality dims like server_address, le)
+#
+#   observable_via: for infra services with no direct Prometheus instrumentation,
+#     the app services whose client-side metrics expose this dependency's health
+
+services:
+
+  frontend:
+    protocol: http
+    port: 8080
+    language: typescript
+    depends_on:
+      - checkout
+      - cart
+      - productcatalog
+      - recommendation
+      - currency
+      - shipping
+      - flagd
+    metrics:
+      # NOTE: frontend uses legacy OTel HTTP semantic conventions (milliseconds suffix,
+      # http_status_code label instead of http_response_status_code)
+      - name: http_server_duration_milliseconds
+        type: histogram
+        category: golden_signal
+        labels:
+          service_name: [frontend]
+          http_method: [GET, POST]
+          http_status_code: ["200", "308", "500"]
+          http_flavor: ["1.1"]
+          http_scheme: [http]
+          net_host_name: [frontend-proxy, localhost]
+          net_host_port: ["8080"]
+          le: []  # histogram bucket boundary
+
+      - name: http_client_duration_milliseconds
+        type: histogram
+        category: golden_signal
+        labels:
+          service_name: [frontend]
+          http_method: [GET]
+          net_peer_name: []  # high-cardinality
+          le: []  # histogram bucket boundary
+
+      - name: app_frontend_requests_total
+        type: counter
+        category: custom
+        labels:
+          service_name: [frontend]
+          method: [GET, POST]
+          status: ["200", "500"]
+          target: []  # high-cardinality (per-product URLs)
+
+      - name: traces_span_metrics_duration_milliseconds
+        type: histogram
+        category: golden_signal
+        labels:
+          service_name: [frontend]
+          span_kind: [SPAN_KIND_CLIENT, SPAN_KIND_INTERNAL, SPAN_KIND_SERVER]
+          span_name:
+            - "GET /"
+            - "GET /_error"
+            - "GET /api/cart"
+            - "GET /api/data"
+            - "GET /api/products/[productId]/index"
+            - "GET /api/recommendations"
+            - "POST /_error"
+            - "POST /api/cart"
+            - "POST /api/checkout"
+            - dns.lookup
+            - "executing api route (pages) /api/cart"
+            - "executing api route (pages) /api/checkout"
+            - "executing api route (pages) /api/data"
+            - "executing api route (pages) /api/products/[productId]/index"
+            - "executing api route (pages) /api/recommendations"
+            - "oteldemo.AdService/GetAds"
+            - "oteldemo.CartService/AddItem"
+            - "oteldemo.CartService/GetCart"
+            - "oteldemo.CheckoutService/PlaceOrder"
+            - "oteldemo.ProductCatalogService/GetProduct"
+            - "oteldemo.RecommendationService/ListRecommendations"
+            - "render route (pages) /"
+            - "render route (pages) /_error"
+            - resolve page components
+            - tcp.connect
+          status_code: [STATUS_CODE_ERROR, STATUS_CODE_UNSET]
+          le: []  # histogram bucket boundary
+
+      - name: traces_span_metrics_calls_total
+        type: counter
+        category: golden_signal
+        labels:
+          service_name: [frontend]
+          span_kind: [SPAN_KIND_CLIENT, SPAN_KIND_INTERNAL, SPAN_KIND_SERVER]
+          span_name:
+            - "GET /"
+            - "GET /_error"
+            - "GET /api/cart"
+            - "GET /api/data"
+            - "GET /api/products/[productId]/index"
+            - "GET /api/recommendations"
+            - "POST /_error"
+            - "POST /api/cart"
+            - "POST /api/checkout"
+            - dns.lookup
+            - "executing api route (pages) /api/cart"
+            - "executing api route (pages) /api/checkout"
+            - "executing api route (pages) /api/data"
+            - "executing api route (pages) /api/products/[productId]/index"
+            - "executing api route (pages) /api/recommendations"
+            - "oteldemo.AdService/GetAds"
+            - "oteldemo.CartService/AddItem"
+            - "oteldemo.CartService/GetCart"
+            - "oteldemo.CheckoutService/PlaceOrder"
+            - "oteldemo.ProductCatalogService/GetProduct"
+            - "oteldemo.RecommendationService/ListRecommendations"
+            - "render route (pages) /"
+            - "render route (pages) /_error"
+            - resolve page components
+            - tcp.connect
+          status_code: [STATUS_CODE_ERROR, STATUS_CODE_UNSET]
+
+      - name: nodejs_eventloop_delay_max_seconds
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [frontend]
+
+      - name: nodejs_eventloop_delay_mean_seconds
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [frontend]
+
+      - name: nodejs_eventloop_delay_min_seconds
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [frontend]
+
+      - name: nodejs_eventloop_delay_p50_seconds
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [frontend]
+
+      - name: nodejs_eventloop_delay_p90_seconds
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [frontend]
+
+      - name: nodejs_eventloop_delay_p99_seconds
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [frontend]
+
+      - name: nodejs_eventloop_delay_stddev_seconds
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [frontend]
+
+      - name: nodejs_eventloop_time_seconds_total
+        type: counter
+        category: runtime
+        labels:
+          service_name: [frontend]
+          nodejs_eventloop_state: [active, idle]
+
+      - name: nodejs_eventloop_utilization_ratio
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [frontend]
+
+      - name: v8js_gc_duration_seconds
+        type: histogram
+        category: runtime
+        labels:
+          service_name: [frontend]
+          v8js_gc_type: [incremental, major, minor]
+          le: []  # histogram bucket boundary
+
+      - name: v8js_memory_heap_limit_bytes
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [frontend]
+          v8js_heap_space_name:
+            - code_large_object_space
+            - code_space
+            - large_object_space
+            - new_large_object_space
+            - new_space
+            - old_space
+            - read_only_space
+            - shared_large_object_space
+            - shared_space
+            - trusted_large_object_space
+            - trusted_space
+
+      - name: v8js_memory_heap_space_available_size_bytes
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [frontend]
+          v8js_heap_space_name:
+            - code_large_object_space
+            - code_space
+            - large_object_space
+            - new_large_object_space
+            - new_space
+            - old_space
+            - read_only_space
+            - shared_large_object_space
+            - shared_space
+            - trusted_large_object_space
+            - trusted_space
+
+      - name: v8js_memory_heap_space_physical_size_bytes
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [frontend]
+          v8js_heap_space_name:
+            - code_large_object_space
+            - code_space
+            - large_object_space
+            - new_large_object_space
+            - new_space
+            - old_space
+            - read_only_space
+            - shared_large_object_space
+            - shared_space
+            - trusted_large_object_space
+            - trusted_space
+
+      - name: v8js_memory_heap_used_bytes
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [frontend]
+          v8js_heap_space_name:
+            - code_large_object_space
+            - code_space
+            - large_object_space
+            - new_large_object_space
+            - new_space
+            - old_space
+            - read_only_space
+            - shared_large_object_space
+            - shared_space
+            - trusted_large_object_space
+            - trusted_space
+
+      - name: target_info
+        type: gauge
+        category: meta
+        labels:
+          service_name: [frontend]
+          telemetry_sdk_language: [nodejs]
+          telemetry_sdk_name: [opentelemetry]
+          process_runtime_name: [nodejs]
+
+    logs:
+      # Frontend Go app does NOT emit structured logs to OpenSearch.
+      # Source: Envoy sidecar proxy (resource.service.name="frontend-proxy",
+      #         resource.log_name="otel_envoy_access_log"). No OTel severity.
+      source: opensearch
+      index_pattern: "otel-logs-*"
+      service_name_field: "resource.log_name.keyword"
+      service_name_value: "otel_envoy_access_log"  # resource.service.name="frontend-proxy"
+      timestamp_field: "@timestamp"
+      severity_field: null  # no OTel severity on envoy access logs
+      body_field: body
+      # Envoy access log body format (space-delimited):
+      # [timestamp] "METHOD path HTTP/version" STATUS bytes_recv bytes_sent duration_ms upstream_duration_ms ...
+      # Example: [2026-04-12T23:13:10.245Z] "POST /api/checkout HTTP/1.1" 500 - via_upstream - "-" 388 21 111 109 ...
+      body_parse:
+        method: 'regex:^\\[.*?\\] "([A-Z]+) '         # e.g. GET, POST
+        path: 'regex:^\\[.*?\\] "[A-Z]+ ([^ ]+) '     # e.g. /api/checkout
+        status_code: 'regex:" ([0-9]{3}) '             # e.g. 500
+        duration_ms: 'regex:" [0-9]{3} [^ ]+ [^ ]+ [^ ]+ [^ ]+ [^ ]+ [0-9]+ [0-9]+ ([0-9]+) '  # field 9 (0-indexed)
+      error_filter:
+        field: body
+        regex: '" [45][0-9]{2} '  # matches 4xx/5xx status codes embedded in body string
+      trace_id_field: traceId
+      span_id_field: spanId
+      key_attribute_fields:
+        - attributes.url.path           # e.g. /api/products/6E92ZMYYFZ, /api/cart, /api/checkout
+        - attributes.url.full           # full URL including host
+        - attributes.url.query          # query string ("-" if absent)
+        - attributes.upstream.cluster   # envoy upstream cluster name (e.g. "frontend")
+        - attributes.upstream.host      # upstream IP:port
+        - attributes.server.address     # frontend-proxy:8080
+        - attributes.source.address     # client IP
+        - attributes.destination.address
+        - attributes.user_agent.original
+        - attributes.event.name         # "proxy.access"
+
+    traces:
+      jaeger_service: frontend
+      server_operations:
+        - "GET /"
+        - "GET /_error"
+        - "GET /api/cart"
+        - "GET /api/data"
+        - "GET /api/products/[productId]/index"
+        - "GET /api/recommendations"
+        - "POST /_error"
+        - "POST /api/cart"
+        - "POST /api/checkout"
+      client_operations:
+        - oteldemo.CartService/AddItem
+        - oteldemo.CartService/GetCart
+        - oteldemo.CheckoutService/PlaceOrder
+        - oteldemo.ProductCatalogService/GetProduct
+        - oteldemo.RecommendationService/ListRecommendations
+        - oteldemo.AdService/GetAds
+      error_tag: error
+      lookback_default_minutes: 30
+
+  checkout:
+    protocol: grpc
+    port: 5050
+    language: go
+    depends_on:
+      - cart
+      - productcatalog
+      - currency
+      - shipping
+      - payment
+      - email
+      - flagd
+    metrics:
+      - name: rpc_server_call_duration_seconds
+        type: histogram
+        category: golden_signal
+        labels:
+          service_name: [checkout]
+          rpc_method: ["oteldemo.CheckoutService/PlaceOrder"]
+          rpc_response_status_code: [INTERNAL, OK]
+          rpc_system_name: [grpc]
+          le: []  # histogram bucket boundary
+
+      - name: rpc_client_call_duration_seconds
+        type: histogram
+        category: golden_signal
+        labels:
+          service_name: [checkout]
+          rpc_method:
+            - "oteldemo.CartService/EmptyCart"
+            - "oteldemo.CartService/GetCart"
+            - "oteldemo.CurrencyService/Convert"
+            - "oteldemo.PaymentService/Charge"
+            - "oteldemo.ProductCatalogService/GetProduct"
+          rpc_response_status_code: [OK, UNAVAILABLE]
+          rpc_system_name: [grpc]
+          server_address: []  # high-cardinality
+          server_port: []  # high-cardinality
+          le: []  # histogram bucket boundary
+
+      - name: http_client_request_duration_seconds
+        type: histogram
+        category: golden_signal
+        labels:
+          service_name: [checkout]
+          http_request_method: [POST]
+          http_response_status_code: ["200", "400"]
+          network_protocol_name: [http]
+          network_protocol_version: ["1.1"]
+          server_address: []  # high-cardinality
+          server_port: []  # high-cardinality
+          url_scheme: [http]
+          le: []  # histogram bucket boundary
+
+      - name: http_client_request_body_size_bytes
+        type: histogram
+        category: custom
+        labels:
+          service_name: [checkout]
+          http_request_method: [POST]
+          http_response_status_code: ["200", "400"]
+          network_protocol_name: [http]
+          network_protocol_version: ["1.1"]
+          server_address: []  # high-cardinality
+          server_port: []  # high-cardinality
+          url_scheme: [http]
+          le: []  # histogram bucket boundary
+
+      - name: traces_span_metrics_duration_milliseconds
+        type: histogram
+        category: golden_signal
+        labels:
+          service_name: [checkout]
+          span_kind: [SPAN_KIND_CLIENT, SPAN_KIND_INTERNAL, SPAN_KIND_SERVER]
+          span_name:
+            - POST
+            - "oteldemo.CartService/EmptyCart"
+            - "oteldemo.CartService/GetCart"
+            - "oteldemo.CheckoutService/PlaceOrder"
+            - "oteldemo.CurrencyService/Convert"
+            - "oteldemo.PaymentService/Charge"
+            - "oteldemo.ProductCatalogService/GetProduct"
+            - prepareOrderItemsAndShippingQuoteFromCart
+          status_code: [STATUS_CODE_ERROR, STATUS_CODE_UNSET]
+          le: []  # histogram bucket boundary
+
+      - name: traces_span_metrics_calls_total
+        type: counter
+        category: golden_signal
+        labels:
+          service_name: [checkout]
+          span_kind: [SPAN_KIND_CLIENT, SPAN_KIND_INTERNAL, SPAN_KIND_SERVER]
+          span_name:
+            - POST
+            - "oteldemo.CartService/EmptyCart"
+            - "oteldemo.CartService/GetCart"
+            - "oteldemo.CheckoutService/PlaceOrder"
+            - "oteldemo.CurrencyService/Convert"
+            - "oteldemo.PaymentService/Charge"
+            - "oteldemo.ProductCatalogService/GetProduct"
+            - prepareOrderItemsAndShippingQuoteFromCart
+          status_code: [STATUS_CODE_ERROR, STATUS_CODE_UNSET]
+
+      - name: ALERTS
+        type: gauge
+        category: meta
+        labels:
+          service_name: [checkout]
+          alertname: [PaymentServiceUnreachable]
+          alertstate: [firing, pending]
+          rpc_method: ["oteldemo.PaymentService/Charge"]
+          severity: [critical]
+
+      - name: ALERTS_FOR_STATE
+        type: gauge
+        category: meta
+        labels:
+          service_name: [checkout]
+          alertname: [PaymentServiceUnreachable]
+          rpc_method: ["oteldemo.PaymentService/Charge"]
+          severity: [critical]
+
+      - name: go_config_gogc_percent
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [checkout]
+
+      - name: go_goroutine
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [checkout]
+
+      - name: go_memory_allocated_bytes_total
+        type: counter
+        category: runtime
+        labels:
+          service_name: [checkout]
+
+      - name: go_memory_allocations_total
+        type: counter
+        category: runtime
+        labels:
+          service_name: [checkout]
+
+      - name: go_memory_gc_goal_bytes
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [checkout]
+
+      - name: go_memory_limit_bytes
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [checkout]
+
+      - name: go_memory_used_bytes
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [checkout]
+          go_memory_type: [other, stack]
+
+      - name: go_processor_limit
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [checkout]
+
+      - name: target_info
+        type: gauge
+        category: meta
+        labels:
+          service_name: [checkout]
+          telemetry_sdk_language: [go]
+          telemetry_sdk_name: [opentelemetry]
+          process_runtime_name: [go]
+          process_runtime_version: ["go1.25.9"]
+
+    logs:
+      source: opensearch
+      index_pattern: "otel-logs-*"
+      service_name_field: "resource.service.name.keyword"
+      service_name_value: "checkout"
+      timestamp_field: "@timestamp"
+      severity_field: "severity.text"
+      severity_values:
+        error: [ERROR, error, Error]
+        warn: [WARN, warn, Warning]
+        info: [INFO, info, Information]
+      body_field: body
+      error_filter:
+        field: severity.text
+        values: [ERROR, error, Error, WARN, warn, Warning]
+      trace_id_field: traceId
+      span_id_field: spanId
+      key_attribute_fields:
+        - attributes.user_id
+        - attributes.user_currency
+
+    traces:
+      jaeger_service: checkout
+      server_operations:
+        - oteldemo.CheckoutService/PlaceOrder
+        - prepareOrderItemsAndShippingQuoteFromCart
+      client_operations:
+        - oteldemo.CartService/EmptyCart
+        - oteldemo.CartService/GetCart
+        - oteldemo.CurrencyService/Convert
+        - oteldemo.PaymentService/Charge
+        - oteldemo.ProductCatalogService/GetProduct
+      error_tag: error
+      lookback_default_minutes: 30
+
+  cart:
+    protocol: grpc
+    port: 7070
+    language: dotnet
+    depends_on:
+      - valkey-cart
+      - flagd
+    metrics:
+      # cart exposes modern OTel HTTP semantics despite being a gRPC service (dotnet/kestrel)
+      - name: http_server_request_duration_seconds
+        type: histogram
+        category: golden_signal
+        labels:
+          service_name: [cart]
+          http_request_method: [POST]
+          http_response_status_code: ["200"]
+          http_route:
+            - /oteldemo.CartService/AddItem
+            - /oteldemo.CartService/EmptyCart
+            - /oteldemo.CartService/GetCart
+          network_protocol_version: ["2"]
+          url_scheme: [http]
+          le: []  # histogram bucket boundary
+
+      - name: http_server_active_requests
+        type: gauge
+        category: golden_signal
+        labels:
+          service_name: [cart]
+          http_request_method: [POST]
+          url_scheme: [http]
+
+      # app_cart_* metrics indirectly reflect redis round-trip latency
+      - name: app_cart_add_item_latency_seconds
+        type: histogram
+        category: custom
+        labels:
+          service_name: [cart]
+          le: []  # histogram bucket boundary
+
+      - name: app_cart_get_cart_latency_seconds
+        type: histogram
+        category: custom
+        labels:
+          service_name: [cart]
+          le: []  # histogram bucket boundary
+
+      - name: feature_flag_evaluation_active
+        type: gauge
+        category: custom
+        labels:
+          service_name: [cart]
+          feature_flag_key: [cartFailure, failedReadinessProbe]
+          feature_flag_provider_name: [flagd Provider]
+
+      - name: feature_flag_evaluation_requests_total
+        type: counter
+        category: custom
+        labels:
+          service_name: [cart]
+          feature_flag_key: [cartFailure, failedReadinessProbe]
+          feature_flag_provider_name: [flagd Provider]
+
+      - name: feature_flag_evaluation_success_total
+        type: counter
+        category: custom
+        labels:
+          service_name: [cart]
+          feature_flag_key: [cartFailure, failedReadinessProbe]
+          feature_flag_provider_name: [flagd Provider]
+          feature_flag_result_reason: [STATIC]
+
+      - name: feature_flag_evaluation_error_total
+        type: counter
+        category: custom
+        labels:
+          service_name: [cart]
+          feature_flag_key: [failedReadinessProbe]
+          feature_flag_provider_name: [flagd Provider]
+          exception: []  # high-cardinality error message
+
+      - name: traces_span_metrics_duration_milliseconds
+        type: histogram
+        category: golden_signal
+        labels:
+          service_name: [cart]
+          span_kind: [SPAN_KIND_CLIENT, SPAN_KIND_SERVER]
+          span_name:
+            - POST
+            - POST /oteldemo.CartService/AddItem
+            - POST /oteldemo.CartService/EmptyCart
+            - POST /oteldemo.CartService/GetCart
+            - "flagd.evaluation.v2.Service/EventStream"
+            - "flagd.evaluation.v2.Service/ResolveBoolean"
+            - "valkey-cart:6379"
+          status_code: [STATUS_CODE_ERROR, STATUS_CODE_UNSET]
+          le: []  # histogram bucket boundary
+
+      - name: traces_span_metrics_calls_total
+        type: counter
+        category: golden_signal
+        labels:
+          service_name: [cart]
+          span_kind: [SPAN_KIND_CLIENT, SPAN_KIND_SERVER]
+          span_name:
+            - POST
+            - POST /oteldemo.CartService/AddItem
+            - POST /oteldemo.CartService/EmptyCart
+            - POST /oteldemo.CartService/GetCart
+            - "flagd.evaluation.v2.Service/EventStream"
+            - "flagd.evaluation.v2.Service/ResolveBoolean"
+            - "valkey-cart:6379"
+          status_code: [STATUS_CODE_ERROR, STATUS_CODE_UNSET]
+
+      - name: aspnetcore_memory_pool_allocated_bytes_total
+        type: counter
+        category: runtime
+        labels:
+          service_name: [cart]
+          aspnetcore_memory_pool_owner: [kestrel]
+
+      - name: aspnetcore_memory_pool_evicted_bytes_total
+        type: counter
+        category: runtime
+        labels:
+          service_name: [cart]
+          aspnetcore_memory_pool_owner: [kestrel]
+
+      - name: aspnetcore_memory_pool_pooled_bytes
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [cart]
+          aspnetcore_memory_pool_owner: [kestrel]
+
+      - name: aspnetcore_memory_pool_rented_bytes_total
+        type: counter
+        category: runtime
+        labels:
+          service_name: [cart]
+          aspnetcore_memory_pool_owner: [kestrel]
+
+      - name: aspnetcore_routing_match_attempts_total
+        type: counter
+        category: runtime
+        labels:
+          service_name: [cart]
+          aspnetcore_routing_is_fallback: ["false"]
+          aspnetcore_routing_match_status: [success]
+          http_route:
+            - /oteldemo.CartService/AddItem
+            - /oteldemo.CartService/EmptyCart
+            - /oteldemo.CartService/GetCart
+
+      - name: dotnet_assembly
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [cart]
+
+      - name: dotnet_exceptions_total
+        type: counter
+        category: runtime
+        labels:
+          service_name: [cart]
+          error_type:
+            - DirectoryNotFoundException
+            - FeatureProviderException
+            - HttpRequestException
+            - IOException
+            - ObjectDisposedException
+            - RpcException
+            - SocketException
+            - TaskCanceledException
+
+      - name: dotnet_gc_collections_total
+        type: counter
+        category: runtime
+        labels:
+          service_name: [cart]
+          gc_heap_generation: [gen0, gen1, gen2]
+
+      - name: dotnet_gc_heap_allocated_bytes_total
+        type: counter
+        category: runtime
+        labels:
+          service_name: [cart]
+
+      - name: dotnet_gc_last_collection_heap_fragmentation_size_bytes
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [cart]
+          gc_heap_generation: [gen0, gen1, gen2, loh, poh]
+
+      - name: dotnet_gc_last_collection_heap_size_bytes
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [cart]
+          gc_heap_generation: [gen0, gen1, gen2, loh, poh]
+
+      - name: dotnet_gc_last_collection_memory_committed_size_bytes
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [cart]
+
+      - name: dotnet_gc_pause_time_seconds_total
+        type: counter
+        category: runtime
+        labels:
+          service_name: [cart]
+
+      - name: dotnet_jit_compilation_time_seconds_total
+        type: counter
+        category: runtime
+        labels:
+          service_name: [cart]
+
+      - name: dotnet_jit_compiled_il_size_bytes_total
+        type: counter
+        category: runtime
+        labels:
+          service_name: [cart]
+
+      - name: dotnet_jit_compiled_methods_total
+        type: counter
+        category: runtime
+        labels:
+          service_name: [cart]
+
+      - name: dotnet_monitor_lock_contentions_total
+        type: counter
+        category: runtime
+        labels:
+          service_name: [cart]
+
+      - name: dotnet_process_cpu
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [cart]
+
+      - name: dotnet_process_cpu_time_seconds_total
+        type: counter
+        category: runtime
+        labels:
+          service_name: [cart]
+          cpu_mode: [system, user]
+
+      - name: dotnet_process_memory_working_set_bytes
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [cart]
+
+      - name: dotnet_thread_pool_queue_length_total
+        type: counter
+        category: runtime
+        labels:
+          service_name: [cart]
+
+      - name: dotnet_thread_pool_thread_count_total
+        type: counter
+        category: runtime
+        labels:
+          service_name: [cart]
+
+      - name: dotnet_thread_pool_work_item_count_total
+        type: counter
+        category: runtime
+        labels:
+          service_name: [cart]
+
+      - name: dotnet_timer
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [cart]
+
+      - name: kestrel_active_connections
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [cart]
+          network_transport: [tcp]
+          network_type: [ipv6]
+          server_address: []  # high-cardinality
+          server_port: []  # high-cardinality
+
+      - name: kestrel_connection_duration_seconds
+        type: histogram
+        category: runtime
+        labels:
+          service_name: [cart]
+          error_type: [keep_alive_timeout]
+          network_protocol_name: [http]
+          network_protocol_version: ["2"]
+          network_transport: [tcp]
+          network_type: [ipv6]
+          server_address: []  # high-cardinality
+          server_port: []  # high-cardinality
+          le: []  # histogram bucket boundary
+
+      - name: kestrel_queued_connections
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [cart]
+          network_transport: [tcp]
+          network_type: [ipv6]
+          server_address: []  # high-cardinality
+          server_port: []  # high-cardinality
+
+      - name: kestrel_queued_requests
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [cart]
+          network_protocol_name: [http]
+          network_protocol_version: ["2"]
+          network_transport: [tcp]
+          network_type: [ipv6]
+          server_address: []  # high-cardinality
+          server_port: []  # high-cardinality
+
+      - name: process_cpu
+        type: gauge
+        category: system
+        labels:
+          service_name: [cart]
+
+      - name: process_cpu_time_seconds_total
+        type: counter
+        category: system
+        labels:
+          service_name: [cart]
+          process_cpu_state: [system, user]
+
+      - name: process_memory_usage_bytes
+        type: gauge
+        category: system
+        labels:
+          service_name: [cart]
+
+      - name: process_memory_virtual_bytes
+        type: gauge
+        category: system
+        labels:
+          service_name: [cart]
+
+      - name: process_thread
+        type: gauge
+        category: system
+        labels:
+          service_name: [cart]
+
+      - name: target_info
+        type: gauge
+        category: meta
+        labels:
+          service_name: [cart]
+          telemetry_sdk_language: [dotnet]
+          telemetry_sdk_name: [opentelemetry]
+          telemetry_sdk_version: ["1.15.1"]
+
+    logs:
+      source: opensearch
+      index_pattern: "otel-logs-*"
+      service_name_field: "resource.service.name.keyword"
+      service_name_value: "cart"
+      timestamp_field: "@timestamp"
+      severity_field: "severity.text"
+      severity_values:
+        error: [ERROR, error, Error]
+        warn: [WARN, warn, Warning]
+        info: [INFO, info, Information]
+      body_field: body
+      error_filter:
+        field: severity.text
+        values: [ERROR, error, Error, WARN, warn, Warning]
+      trace_id_field: traceId
+      span_id_field: spanId
+      key_attribute_fields:
+        - attributes.userId
+        - attributes.productId
+        - attributes.quantity
+
+    traces:
+      jaeger_service: cart
+      server_operations:
+        - POST /oteldemo.CartService/AddItem
+        - POST /oteldemo.CartService/EmptyCart
+        - POST /oteldemo.CartService/GetCart
+      client_operations:
+        - valkey-cart:6379
+        - flagd.evaluation.v2.Service/ResolveBoolean
+      error_tag: error
+      lookback_default_minutes: 30
+
+  shipping:
+    protocol: http
+    port: 50050
+    language: rust
+    depends_on:
+      - quote
+    metrics:
+      # Rust service exposes HTTP server metrics despite grpc in protocol field
+      - name: http_server_duration_seconds
+        type: histogram
+        category: golden_signal
+        labels:
+          service_name: [shipping]
+          http_request_method: [POST]
+          http_response_status_code: ["200", "400"]
+          http_route: [/get-quote, /ship-order]
+          network_protocol_version: ["1.1"]
+          server_address: []  # high-cardinality
+          server_port: []  # high-cardinality
+          url_scheme: [http]
+          le: []  # histogram bucket boundary
+
+      - name: http_server_active_requests
+        type: gauge
+        category: golden_signal
+        labels:
+          service_name: [shipping]
+          http_request_method: [POST]
+          http_route: [/get-quote, /ship-order]
+          network_protocol_version: ["1.1"]
+          server_address: []  # high-cardinality
+          server_port: []  # high-cardinality
+          url_scheme: [http]
+
+      - name: http_server_request_size_bytes
+        type: histogram
+        category: custom
+        labels:
+          service_name: [shipping]
+          http_request_method: [POST]
+          http_route: [/get-quote, /ship-order]
+          network_protocol_version: ["1.1"]
+          server_address: []  # high-cardinality
+          server_port: []  # high-cardinality
+          url_scheme: [http]
+          le: []  # histogram bucket boundary
+
+      - name: http_server_response_size_bytes
+        type: histogram
+        category: custom
+        labels:
+          service_name: [shipping]
+          http_request_method: [POST]
+          http_response_status_code: ["200", "400"]
+          http_route: [/get-quote, /ship-order]
+          network_protocol_version: ["1.1"]
+          server_address: []  # high-cardinality
+          server_port: []  # high-cardinality
+          url_scheme: [http]
+          le: []  # histogram bucket boundary
+
+      - name: app_shipping_items_count_total
+        type: counter
+        category: custom
+        labels:
+          service_name: [shipping]
+
+      - name: traces_span_metrics_duration_milliseconds
+        type: histogram
+        category: golden_signal
+        labels:
+          service_name: [shipping]
+          span_kind: [SPAN_KIND_CLIENT, SPAN_KIND_SERVER]
+          span_name: [POST, POST /get-quote, POST /ship-order]
+          status_code: [STATUS_CODE_UNSET]
+          le: []  # histogram bucket boundary
+
+      - name: traces_span_metrics_calls_total
+        type: counter
+        category: golden_signal
+        labels:
+          service_name: [shipping]
+          span_kind: [SPAN_KIND_CLIENT, SPAN_KIND_SERVER]
+          span_name: [POST, POST /get-quote, POST /ship-order]
+          status_code: [STATUS_CODE_UNSET]
+
+      - name: target_info
+        type: gauge
+        category: meta
+        labels:
+          service_name: [shipping]
+          telemetry_sdk_language: [rust]
+          telemetry_sdk_name: [opentelemetry]
+          process_runtime_name: [rustc]
+          process_runtime_version: ["1.91.1"]
+
+    logs:
+      source: opensearch
+      index_pattern: "otel-logs-*"
+      service_name_field: "resource.service.name.keyword"
+      service_name_value: "shipping"
+      timestamp_field: "@timestamp"
+      severity_field: "severity.text"
+      severity_values:
+        error: [ERROR, error, Error]
+        warn: [WARN, warn, Warning]
+        info: [INFO, info, Information]
+      body_field: body
+      error_filter:
+        field: severity.text
+        values: [ERROR, error, Error, WARN, warn, Warning]
+      trace_id_field: traceId
+      span_id_field: spanId
+      key_attribute_fields:
+        - attributes.quote.cents
+        - attributes.quote.dollars
+        - attributes.name
+        - attributes.quote_service_addr
+
+    traces:
+      jaeger_service: shipping
+      server_operations:
+        - POST /get-quote
+        - POST /ship-order
+      client_operations: []  # calls quote service internally, no client spans emitted
+      error_tag: error
+      lookback_default_minutes: 30
+
+  productcatalog:
+    protocol: grpc
+    port: 3550
+    language: go
+    depends_on:
+      - astronomy-db
+      - flagd
+    metrics:
+      # Prometheus service_name is hyphenated: "product-catalog" (not "productcatalog")
+      - name: rpc_server_call_duration_seconds
+        type: histogram
+        category: golden_signal
+        labels:
+          service_name: [product-catalog]
+          rpc_method:
+            - "oteldemo.ProductCatalogService/GetProduct"
+            - "oteldemo.ProductCatalogService/ListProducts"
+          rpc_response_status_code: [OK]
+          rpc_system_name: [grpc]
+          le: []  # histogram bucket boundary
+
+      # db_client_* metrics are the primary signal for postgres health
+      - name: db_client_operation_duration_seconds
+        type: histogram
+        category: golden_signal
+        labels:
+          service_name: [product-catalog]
+          db_operation_name: [sql.conn.ping, sql.conn.query, sql.conn.reset_session, sql.rows]
+          db_system_name: [postgresql]
+          server_address: []  # high-cardinality
+          le: []  # histogram bucket boundary
+
+      - name: db_sql_connection_closed_max_idle_time_total
+        type: counter
+        category: custom
+        labels:
+          service_name: [product-catalog]
+          db_system_name: [postgresql]
+          server_address: []  # high-cardinality
+
+      - name: db_sql_connection_closed_max_idle_total
+        type: counter
+        category: custom
+        labels:
+          service_name: [product-catalog]
+          db_system_name: [postgresql]
+          server_address: []  # high-cardinality
+
+      - name: db_sql_connection_closed_max_lifetime_total
+        type: counter
+        category: custom
+        labels:
+          service_name: [product-catalog]
+          db_system_name: [postgresql]
+          server_address: []  # high-cardinality
+
+      - name: db_sql_connection_max_open
+        type: gauge
+        category: custom
+        labels:
+          service_name: [product-catalog]
+          db_system_name: [postgresql]
+          server_address: []  # high-cardinality
+
+      - name: db_sql_connection_open
+        type: gauge
+        category: custom
+        labels:
+          service_name: [product-catalog]
+          db_system_name: [postgresql]
+          server_address: []  # high-cardinality
+          status: [idle, inuse]
+
+      - name: db_sql_connection_wait_duration_milliseconds_total
+        type: counter
+        category: custom
+        labels:
+          service_name: [product-catalog]
+          db_system_name: [postgresql]
+          server_address: []  # high-cardinality
+
+      - name: db_sql_connection_wait_total
+        type: counter
+        category: custom
+        labels:
+          service_name: [product-catalog]
+          db_system_name: [postgresql]
+          server_address: []  # high-cardinality
+
+      - name: traces_span_metrics_duration_milliseconds
+        type: histogram
+        category: golden_signal
+        labels:
+          service_name: [product-catalog]
+          span_kind: [SPAN_KIND_CLIENT, SPAN_KIND_SERVER]
+          span_name:
+            - astronomy-db
+            - "oteldemo.ProductCatalogService/GetProduct"
+            - "oteldemo.ProductCatalogService/ListProducts"
+          status_code: [STATUS_CODE_UNSET]
+          le: []  # histogram bucket boundary
+
+      - name: traces_span_metrics_calls_total
+        type: counter
+        category: golden_signal
+        labels:
+          service_name: [product-catalog]
+          span_kind: [SPAN_KIND_CLIENT, SPAN_KIND_SERVER]
+          span_name:
+            - astronomy-db
+            - "oteldemo.ProductCatalogService/GetProduct"
+            - "oteldemo.ProductCatalogService/ListProducts"
+          status_code: [STATUS_CODE_UNSET]
+
+      - name: ALERTS
+        type: gauge
+        category: meta
+        labels:
+          service_name: [product-catalog]
+          alertname: [HighDatabaseLatency]
+          alertstate: [firing, pending]
+          severity: [warning]
+
+      - name: ALERTS_FOR_STATE
+        type: gauge
+        category: meta
+        labels:
+          service_name: [product-catalog]
+          alertname: [HighDatabaseLatency]
+          severity: [warning]
+
+      - name: go_config_gogc_percent
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [product-catalog]
+
+      - name: go_goroutine
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [product-catalog]
+
+      - name: go_memory_allocated_bytes_total
+        type: counter
+        category: runtime
+        labels:
+          service_name: [product-catalog]
+
+      - name: go_memory_allocations_total
+        type: counter
+        category: runtime
+        labels:
+          service_name: [product-catalog]
+
+      - name: go_memory_gc_goal_bytes
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [product-catalog]
+
+      - name: go_memory_limit_bytes
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [product-catalog]
+
+      - name: go_memory_used_bytes
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [product-catalog]
+          go_memory_type: [other, stack]
+
+      - name: go_processor_limit
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [product-catalog]
+
+      - name: target_info
+        type: gauge
+        category: meta
+        labels:
+          service_name: [product-catalog]
+          telemetry_sdk_language: [go]
+          telemetry_sdk_name: [opentelemetry]
+
+    logs:
+      source: opensearch
+      index_pattern: "otel-logs-*"
+      service_name_field: "resource.service.name.keyword"
+      service_name_value: "product-catalog"
+      timestamp_field: "@timestamp"
+      severity_field: "severity.text"
+      severity_values:
+        error: [ERROR, error, Error]
+        warn: [WARN, warn, Warning]
+        info: [INFO, info, Information]
+      body_field: body
+      error_filter:
+        field: severity.text
+        values: [ERROR, error, Error, WARN, warn, Warning]
+      trace_id_field: traceId
+      span_id_field: spanId
+      key_attribute_fields:
+        - attributes.app.product.name
+        - attributes.app.product.id
+        - attributes.products
+
+    traces:
+      jaeger_service: product-catalog
+      server_operations:
+        - oteldemo.ProductCatalogService/GetProduct
+        - oteldemo.ProductCatalogService/ListProducts
+        - astronomy-db
+      client_operations: []
+      error_tag: error
+      lookback_default_minutes: 30
+
+  productreviews:
+    protocol: grpc
+    port: 3551
+    language: python
+    depends_on:
+      - astronomy-db
+      - productcatalog
+    metrics:
+      # No http_server_* — only span metrics (SPAN_KIND_CLIENT to flagd) + full Python/system runtime
+      - name: traces_span_metrics_duration_milliseconds
+        type: histogram
+        category: golden_signal
+        labels:
+          service_name: [product-reviews]
+          span_kind: [SPAN_KIND_CLIENT]
+          span_name: ["flagd.evaluation.v1.Service/EventStream"]
+          status_code: [STATUS_CODE_ERROR]
+
+      - name: traces_span_metrics_calls_total
+        type: counter
+        category: golden_signal
+        labels:
+          service_name: [product-reviews]
+          span_kind: [SPAN_KIND_CLIENT]
+          span_name: ["flagd.evaluation.v1.Service/EventStream"]
+          status_code: [STATUS_CODE_ERROR]
+
+      - name: process_cpu_time_seconds_total
+        type: counter
+        category: system
+        labels:
+          service_name: [product-reviews]
+          type: [system, user]
+
+      - name: process_cpu_utilization_ratio
+        type: gauge
+        category: system
+        labels:
+          service_name: [product-reviews]
+
+      - name: process_memory_usage_bytes
+        type: gauge
+        category: system
+        labels:
+          service_name: [product-reviews]
+
+      - name: process_memory_virtual_bytes
+        type: gauge
+        category: system
+        labels:
+          service_name: [product-reviews]
+
+      - name: process_open_file_descriptor_count
+        type: gauge
+        category: system
+        labels:
+          service_name: [product-reviews]
+
+      - name: process_thread_count
+        type: gauge
+        category: system
+        labels:
+          service_name: [product-reviews]
+
+      - name: process_context_switches_total
+        type: counter
+        category: system
+        labels:
+          service_name: [product-reviews]
+          type: [involuntary, voluntary]
+
+      - name: system_cpu_time_seconds_total
+        type: counter
+        category: system
+        labels:
+          service_name: [product-reviews]
+          cpu: []  # per-core, high-cardinality
+          state: [idle, irq, system, user]
+
+      - name: system_cpu_utilization_ratio
+        type: gauge
+        category: system
+        labels:
+          service_name: [product-reviews]
+          cpu: []
+          state: [idle, irq, system, user]
+
+      - name: system_memory_usage_bytes
+        type: gauge
+        category: system
+        labels:
+          service_name: [product-reviews]
+          state: [cached, free, used]
+
+      - name: system_memory_utilization_ratio
+        type: gauge
+        category: system
+        labels:
+          service_name: [product-reviews]
+          state: [cached, free, used]
+
+      - name: system_network_io_bytes_total
+        type: counter
+        category: system
+        labels:
+          service_name: [product-reviews]
+          device: [eth0, ip6tnl0, lo, sit0, tunl0]
+          direction: [receive, transmit]
+
+      - name: system_network_errors_total
+        type: counter
+        category: system
+        labels:
+          service_name: [product-reviews]
+          device: [eth0, ip6tnl0, lo, sit0, tunl0]
+          direction: [receive, transmit]
+
+      - name: system_network_dropped_packets_total
+        type: counter
+        category: system
+        labels:
+          service_name: [product-reviews]
+          device: [eth0, ip6tnl0, lo, sit0, tunl0]
+          direction: [receive, transmit]
+
+      - name: system_network_packets_total
+        type: counter
+        category: system
+        labels:
+          service_name: [product-reviews]
+          device: [eth0, ip6tnl0, lo, sit0, tunl0]
+          direction: [receive, transmit]
+
+      - name: system_network_connections
+        type: gauge
+        category: system
+        labels:
+          service_name: [product-reviews]
+          family: ["10", "2"]
+          protocol: [tcp, udp]
+          state: [ESTABLISHED, LISTEN, NONE]
+          type: ["1", "2"]
+
+      - name: system_disk_io_bytes_total
+        type: counter
+        category: system
+        labels:
+          service_name: [product-reviews]
+          device: []  # high-cardinality device list
+          direction: [read, write]
+
+      - name: system_disk_operations_total
+        type: counter
+        category: system
+        labels:
+          service_name: [product-reviews]
+          device: []
+          direction: [read, write]
+
+      - name: system_disk_time_seconds_total
+        type: counter
+        category: system
+        labels:
+          service_name: [product-reviews]
+          device: []
+          direction: [read, write]
+
+      - name: system_swap_usage_pages
+        type: gauge
+        category: system
+        labels:
+          service_name: [product-reviews]
+          state: [free, used]
+
+      - name: system_swap_utilization_ratio
+        type: gauge
+        category: system
+        labels:
+          service_name: [product-reviews]
+          state: [free, used]
+
+      - name: system_thread_count
+        type: gauge
+        category: system
+        labels:
+          service_name: [product-reviews]
+
+      - name: cpython_gc_collections_total
+        type: counter
+        category: runtime
+        labels:
+          service_name: [product-reviews]
+          cpython_gc_generation: ["0", "1", "2"]
+          generation: ["0", "1", "2"]
+
+      - name: cpython_gc_collected_objects_total
+        type: counter
+        category: runtime
+        labels:
+          service_name: [product-reviews]
+          cpython_gc_generation: ["0", "1", "2"]
+          generation: ["0", "1", "2"]
+
+      - name: cpython_gc_uncollectable_objects_total
+        type: counter
+        category: runtime
+        labels:
+          service_name: [product-reviews]
+          cpython_gc_generation: ["0", "1", "2"]
+          generation: ["0", "1", "2"]
+
+      - name: process_runtime_cpython_memory_bytes
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [product-reviews]
+          type: [rss, vms]
+
+      - name: process_runtime_cpython_cpu_time_seconds_total
+        type: counter
+        category: runtime
+        labels:
+          service_name: [product-reviews]
+          type: [system, user]
+
+      - name: process_runtime_cpython_cpu_utilization_ratio
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [product-reviews]
+
+      - name: process_runtime_cpython_gc_count_bytes_total
+        type: counter
+        category: runtime
+        labels:
+          service_name: [product-reviews]
+          count: ["0", "1", "2"]
+
+      - name: process_runtime_cpython_thread_count
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [product-reviews]
+
+      - name: process_runtime_cpython_context_switches_total
+        type: counter
+        category: runtime
+        labels:
+          service_name: [product-reviews]
+          type: [involuntary, voluntary]
+
+      - name: otel_sdk_span_live
+        type: gauge
+        category: meta
+        labels:
+          service_name: [product-reviews]
+          otel_span_sampling_result: [RECORD_AND_SAMPLE]
+
+      - name: otel_sdk_span_started_total
+        type: counter
+        category: meta
+        labels:
+          service_name: [product-reviews]
+          otel_span_parent_origin: [none]
+          otel_span_sampling_result: [RECORD_AND_SAMPLE]
+
+      - name: target_info
+        type: gauge
+        category: meta
+        labels:
+          service_name: [product-reviews]
+          telemetry_sdk_language: [python]
+          telemetry_sdk_name: [opentelemetry]
+
+    logs: null  # product-reviews does not emit logs to OpenSearch
+
+    traces:
+      jaeger_service: product-reviews
+      server_operations:
+        - flagd.evaluation.v1.Service/EventStream
+      client_operations: []
+      error_tag: error
+      lookback_default_minutes: 30
+
+  recommendation:
+    protocol: http
+    port: 9001
+    language: python
+    depends_on:
+      - productcatalog
+      - flagd
+    metrics:
+      - name: traces_span_metrics_duration_milliseconds
+        type: histogram
+        category: golden_signal
+        labels:
+          service_name: [recommendation]
+          span_kind: [SPAN_KIND_CLIENT, SPAN_KIND_INTERNAL, SPAN_KIND_SERVER]
+          span_name:
+            - "flagd.evaluation.v1.Service/EventStream"
+            - "flagd.evaluation.v1.Service/ResolveBoolean"
+            - get_product_list
+            - "oteldemo.ProductCatalogService/ListProducts"
+            - "oteldemo.RecommendationService/ListRecommendations"
+          status_code: [STATUS_CODE_ERROR, STATUS_CODE_UNSET]
+
+      - name: traces_span_metrics_calls_total
+        type: counter
+        category: golden_signal
+        labels:
+          service_name: [recommendation]
+          span_kind: [SPAN_KIND_CLIENT, SPAN_KIND_INTERNAL, SPAN_KIND_SERVER]
+          span_name:
+            - "flagd.evaluation.v1.Service/EventStream"
+            - "flagd.evaluation.v1.Service/ResolveBoolean"
+            - get_product_list
+            - "oteldemo.ProductCatalogService/ListProducts"
+            - "oteldemo.RecommendationService/ListRecommendations"
+          status_code: [STATUS_CODE_ERROR, STATUS_CODE_UNSET]
+
+      - name: app_recommendations_counter_total
+        type: counter
+        category: custom
+        labels:
+          service_name: [recommendation]
+          recommendation_type: [catalog]
+
+      - name: process_cpu_time_seconds_total
+        type: counter
+        category: system
+        labels:
+          service_name: [recommendation]
+          type: [system, user]
+
+      - name: process_cpu_utilization_ratio
+        type: gauge
+        category: system
+        labels:
+          service_name: [recommendation]
+
+      - name: process_memory_usage_bytes
+        type: gauge
+        category: system
+        labels:
+          service_name: [recommendation]
+
+      - name: process_memory_virtual_bytes
+        type: gauge
+        category: system
+        labels:
+          service_name: [recommendation]
+
+      - name: process_open_file_descriptor_count
+        type: gauge
+        category: system
+        labels:
+          service_name: [recommendation]
+
+      - name: process_thread_count
+        type: gauge
+        category: system
+        labels:
+          service_name: [recommendation]
+
+      - name: process_context_switches_total
+        type: counter
+        category: system
+        labels:
+          service_name: [recommendation]
+          type: [involuntary, voluntary]
+
+      - name: system_cpu_time_seconds_total
+        type: counter
+        category: system
+        labels:
+          service_name: [recommendation]
+          cpu: []
+          state: [idle, irq, system, user]
+
+      - name: system_cpu_utilization_ratio
+        type: gauge
+        category: system
+        labels:
+          service_name: [recommendation]
+          cpu: []
+          state: [idle, irq, system, user]
+
+      - name: system_memory_usage_bytes
+        type: gauge
+        category: system
+        labels:
+          service_name: [recommendation]
+          state: [cached, free, used]
+
+      - name: system_memory_utilization_ratio
+        type: gauge
+        category: system
+        labels:
+          service_name: [recommendation]
+          state: [cached, free, used]
+
+      - name: system_network_io_bytes_total
+        type: counter
+        category: system
+        labels:
+          service_name: [recommendation]
+          device: [eth0, ip6tnl0, lo, sit0, tunl0]
+          direction: [receive, transmit]
+
+      - name: system_network_errors_total
+        type: counter
+        category: system
+        labels:
+          service_name: [recommendation]
+          device: [eth0, ip6tnl0, lo, sit0, tunl0]
+          direction: [receive, transmit]
+
+      - name: system_network_dropped_packets_total
+        type: counter
+        category: system
+        labels:
+          service_name: [recommendation]
+          device: [eth0, ip6tnl0, lo, sit0, tunl0]
+          direction: [receive, transmit]
+
+      - name: system_network_packets_total
+        type: counter
+        category: system
+        labels:
+          service_name: [recommendation]
+          device: [eth0, ip6tnl0, lo, sit0, tunl0]
+          direction: [receive, transmit]
+
+      - name: system_network_connections
+        type: gauge
+        category: system
+        labels:
+          service_name: [recommendation]
+          family: ["10", "2"]
+          protocol: [tcp, udp]
+          state: [ESTABLISHED, LISTEN, NONE]
+          type: ["1", "2"]
+
+      - name: system_disk_io_bytes_total
+        type: counter
+        category: system
+        labels:
+          service_name: [recommendation]
+          device: []
+          direction: [read, write]
+
+      - name: system_disk_operations_total
+        type: counter
+        category: system
+        labels:
+          service_name: [recommendation]
+          device: []
+          direction: [read, write]
+
+      - name: system_disk_time_seconds_total
+        type: counter
+        category: system
+        labels:
+          service_name: [recommendation]
+          device: []
+          direction: [read, write]
+
+      - name: system_swap_usage_pages
+        type: gauge
+        category: system
+        labels:
+          service_name: [recommendation]
+          state: [free, used]
+
+      - name: system_swap_utilization_ratio
+        type: gauge
+        category: system
+        labels:
+          service_name: [recommendation]
+          state: [free, used]
+
+      - name: system_thread_count
+        type: gauge
+        category: system
+        labels:
+          service_name: [recommendation]
+
+      - name: cpython_gc_collections_total
+        type: counter
+        category: runtime
+        labels:
+          service_name: [recommendation]
+          cpython_gc_generation: ["0", "1", "2"]
+          generation: ["0", "1", "2"]
+
+      - name: cpython_gc_collected_objects_total
+        type: counter
+        category: runtime
+        labels:
+          service_name: [recommendation]
+          cpython_gc_generation: ["0", "1", "2"]
+          generation: ["0", "1", "2"]
+
+      - name: cpython_gc_uncollectable_objects_total
+        type: counter
+        category: runtime
+        labels:
+          service_name: [recommendation]
+          cpython_gc_generation: ["0", "1", "2"]
+          generation: ["0", "1", "2"]
+
+      - name: process_runtime_cpython_memory_bytes
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [recommendation]
+          type: [rss, vms]
+
+      - name: process_runtime_cpython_cpu_time_seconds_total
+        type: counter
+        category: runtime
+        labels:
+          service_name: [recommendation]
+          type: [system, user]
+
+      - name: process_runtime_cpython_cpu_utilization_ratio
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [recommendation]
+
+      - name: process_runtime_cpython_gc_count_bytes_total
+        type: counter
+        category: runtime
+        labels:
+          service_name: [recommendation]
+          count: ["0", "1", "2"]
+
+      - name: process_runtime_cpython_thread_count
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [recommendation]
+
+      - name: process_runtime_cpython_context_switches_total
+        type: counter
+        category: runtime
+        labels:
+          service_name: [recommendation]
+          type: [involuntary, voluntary]
+
+      - name: otel_sdk_span_live
+        type: gauge
+        category: meta
+        labels:
+          service_name: [recommendation]
+          otel_span_sampling_result: [RECORD_AND_SAMPLE]
+
+      - name: otel_sdk_span_started_total
+        type: counter
+        category: meta
+        labels:
+          service_name: [recommendation]
+          otel_span_parent_origin: [local, none, remote]
+          otel_span_sampling_result: [RECORD_AND_SAMPLE]
+
+      - name: target_info
+        type: gauge
+        category: meta
+        labels:
+          service_name: [recommendation]
+          telemetry_sdk_language: [python]
+          telemetry_sdk_name: [opentelemetry]
+
+    logs:
+      source: opensearch
+      index_pattern: "otel-logs-*"
+      service_name_field: "resource.service.name.keyword"
+      service_name_value: "recommendation"
+      timestamp_field: "@timestamp"
+      severity_field: "severity.text"
+      severity_values:
+        error: [ERROR, error, Error]
+        warn: [WARN, warn, Warning]
+        info: [INFO, info, Information]
+      body_field: body
+      error_filter:
+        field: severity.text
+        values: [ERROR, error, Error, WARN, warn, Warning]
+      trace_id_field: traceId
+      span_id_field: spanId
+      key_attribute_fields:
+        - attributes.otelTraceID
+        - attributes.otelSpanID
+        - attributes.otelServiceName
+        - attributes.code.file.path
+        - attributes.code.function.name
+        - attributes.code.line.number
+
+    traces:
+      jaeger_service: recommendation
+      server_operations:
+        - oteldemo.RecommendationService/ListRecommendations
+        - get_product_list
+      client_operations:
+        - oteldemo.ProductCatalogService/ListProducts
+        - flagd.evaluation.v1.Service/ResolveBoolean
+      error_tag: error
+      lookback_default_minutes: 30
+
+  currency:
+    protocol: grpc
+    port: 7001
+    language: cpp
+    depends_on: []
+    metrics:
+      # Very sparse — C++ service only emits span metrics + custom counter + target_info
+      - name: traces_span_metrics_duration_milliseconds
+        type: histogram
+        category: golden_signal
+        labels:
+          service_name: [currency]
+          span_kind: [SPAN_KIND_SERVER]
+          span_name: ["oteldemo.CurrencyService/Convert"]
+          status_code: [STATUS_CODE_OK]
+
+      - name: traces_span_metrics_calls_total
+        type: counter
+        category: golden_signal
+        labels:
+          service_name: [currency]
+          span_kind: [SPAN_KIND_SERVER]
+          span_name: ["oteldemo.CurrencyService/Convert"]
+          status_code: [STATUS_CODE_OK]
+
+      - name: app_currency_counter_total
+        type: counter
+        category: custom
+        labels:
+          service_name: [currency]
+          currency_code: [CAD, USD]
+
+      - name: target_info
+        type: gauge
+        category: meta
+        labels:
+          service_name: [currency]
+          telemetry_sdk_language: [cpp]
+          telemetry_sdk_name: [opentelemetry]
+
+    logs:
+      source: opensearch
+      index_pattern: "otel-logs-*"
+      service_name_field: "resource.service.name.keyword"
+      service_name_value: "currency"
+      timestamp_field: "@timestamp"
+      severity_field: "severity.text"
+      severity_values:
+        error: [ERROR, error, Error]
+        warn: [WARN, warn, Warning]
+        info: [INFO, info, Information]
+      body_field: body
+      error_filter:
+        field: severity.text
+        values: [ERROR, error, Error, WARN, warn, Warning]
+      trace_id_field: traceId
+      span_id_field: spanId
+      key_attribute_fields: []  # no meaningful app-specific attributes
+
+    traces:
+      jaeger_service: currency
+      server_operations:
+        - oteldemo.CurrencyService/Convert
+      client_operations: []
+      error_tag: error
+      lookback_default_minutes: 30
+
+  quote:
+    protocol: http
+    port: 8090
+    language: php
+    depends_on: []
+    metrics:
+      # PHP service — only span metrics, custom counter, OTel SDK meta
+      - name: traces_span_metrics_duration_milliseconds
+        type: histogram
+        category: golden_signal
+        labels:
+          service_name: [quote]
+          span_kind: [SPAN_KIND_INTERNAL, SPAN_KIND_SERVER]
+          span_name: ["POST /getquote", "calculate-quote", "{closure}"]
+          status_code: [STATUS_CODE_UNSET]
+
+      - name: traces_span_metrics_calls_total
+        type: counter
+        category: golden_signal
+        labels:
+          service_name: [quote]
+          span_kind: [SPAN_KIND_INTERNAL, SPAN_KIND_SERVER]
+          span_name: ["POST /getquote", "calculate-quote", "{closure}"]
+          status_code: [STATUS_CODE_UNSET]
+
+      - name: quotes_total
+        type: counter
+        category: custom
+        labels:
+          service_name: [quote]
+          number_of_items: []  # high-cardinality integer (1–35+ seen in data)
+
+      - name: otel_trace_span_processor_queue_usage
+        type: gauge
+        category: meta
+        labels:
+          service_name: [quote]
+          processor: [batching]
+          state: [free, pending, queued]
+
+      - name: otel_trace_span_processor_queue_limit
+        type: gauge
+        category: meta
+        labels:
+          service_name: [quote]
+          processor: [batching]
+
+      - name: otel_trace_span_processor_spans
+        type: gauge
+        category: meta
+        labels:
+          service_name: [quote]
+          processor: [batching]
+          state: [dropped, pending, processed, queued]
+
+      - name: otel_logs_log_processor_queue_usage
+        type: gauge
+        category: meta
+        labels:
+          service_name: [quote]
+          processor: [batching]
+          state: [free, pending, queued]
+
+      - name: otel_logs_log_processor_queue_limit
+        type: gauge
+        category: meta
+        labels:
+          service_name: [quote]
+          processor: [batching]
+
+      - name: otel_logs_log_processor_logs
+        type: gauge
+        category: meta
+        labels:
+          service_name: [quote]
+          processor: [batching]
+          state: [dropped, pending, processed, queued]
+
+      - name: target_info
+        type: gauge
+        category: meta
+        labels:
+          service_name: [quote]
+          telemetry_sdk_language: [php]
+          telemetry_sdk_name: [opentelemetry]
+
+    logs:
+      source: opensearch
+      index_pattern: "otel-logs-*"
+      service_name_field: "resource.service.name.keyword"
+      service_name_value: "quote"
+      timestamp_field: "@timestamp"
+      severity_field: "severity.text"
+      severity_values:
+        error: [ERROR, error, Error]
+        warn: [WARN, warn, Warning]
+        info: [INFO, info, Information]
+      body_field: body
+      error_filter:
+        field: severity.text
+        values: [ERROR, error, Error, WARN, warn, Warning]
+      trace_id_field: traceId
+      span_id_field: spanId
+      key_attribute_fields:
+        - attributes.context.total
+
+    traces:
+      jaeger_service: quote
+      server_operations:
+        - POST /getquote
+        - calculate-quote
+        - "{closure}"
+      client_operations: []
+      error_tag: error
+      lookback_default_minutes: 30
+
+  payment:
+    protocol: grpc
+    port: 50051
+    language: nodejs
+    depends_on:
+      - flagd
+    metrics:
+      - name: app_payment_transactions
+        type: counter
+        category: custom
+        labels:
+          service_name: [payment]
+          app_payment_currency: []  # high-cardinality currency codes
+    logs:
+      source: opensearch
+      index_pattern: "otel-logs-*"
+      service_name_field: "resource.service.name.keyword"
+      service_name_value: "payment"
+      timestamp_field: "@timestamp"
+      severity_field: "severity.text"
+      severity_values:
+        error: [ERROR, error, Error]
+        warn: [WARN, warn, Warning]
+        info: [INFO, info, Information]
+      body_field: body
+      error_filter:
+        field: severity.text
+        values: [ERROR, error, Error, WARN, warn, Warning]
+      trace_id_field: traceId
+      span_id_field: spanId
+      key_attribute_fields:
+        - attributes.transactionId
+        - attributes.cardType
+        - attributes.lastFourDigits
+        - attributes.amount
+        - attributes.loyalty_level
+    traces:
+      jaeger_service: payment
+      server_operations:
+        - oteldemo.PaymentService/Charge
+      client_operations: []
+      error_tag: error
+      lookback_default_minutes: 30
+
+  flagd:
+    protocol: http
+    port: 8013
+    language: n/a
+    depends_on: []
+    metrics: []
+    observable_via:
+      metrics:
+        - cart          # feature_flag_evaluation_* metrics on cart reflect flagd flag evaluations
+        - recommendation  # flagd.evaluation.v1.Service/ResolveBoolean client spans on recommendation
+        - productreviews  # flagd.evaluation.v1.Service/EventStream client spans on product-reviews
+    logs: null
+    traces:
+      jaeger_service: flagd
+      server_operations: []
+      client_operations: []
+      error_tag: error
+      lookback_default_minutes: 30
+
+  valkey-cart:
+    protocol: http
+    port: 6379
+    language: n/a
+    depends_on: []
+    metrics: []  # not instrumented with OTel; no Prometheus series under service_name="valkey-cart"
+    observable_via:
+      metrics:
+        - cart  # app_cart_add_item_latency_seconds + app_cart_get_cart_latency_seconds
+                # reflect valkey round-trip latency from cart's perspective
+
+  astronomy-db:
+    protocol: http
+    port: 5432
+    language: n/a
+    depends_on: []
+    metrics: []  # not instrumented with OTel; no Prometheus series under service_name="astronomy-db"
+    observable_via:
+      metrics:
+        - productcatalog  # db_client_operation_duration_seconds{service_name="product-catalog"}
+                          # db_sql_connection_* pool metrics on product-catalog
+        - productreviews  # shares same astronomy-db instance; no client-side db metrics available
