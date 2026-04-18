@@ -18,6 +18,7 @@ graph TB
         S6["🎯 Recommendation<br/>Python :9001"]
         S7["💱 Currency<br/>C++ :7001"]
         S8["💬 Quote<br/>PHP :8090"]
+        S9["💳 Payment<br/>Go :8080"]
     end
 
     subgraph "Data"
@@ -43,12 +44,14 @@ graph TB
     LG -->|HTTP| FP
     FP --> FE
     FE --> S1 & S2 & S4 & S6 & S7
-    S1 --> S2 & S4 & S3 & S7
+    S1 --> S2 & S4 & S3 & S7 & S9
     S3 --> S8
     S6 --> S4
+    S5 --> S4
 
     %% Feature flags
-    FLAGD -.->|flags| S1 & S2 & S4 & S6
+    FLAGD -.->|flags| S1 & S2 & S4 & S6 & S9
+    LG -.->|depends on| FLAGD
 
     %% Data layer
     S4 --> DB
@@ -56,13 +59,13 @@ graph TB
     S2 --> CACHE
 
     %% Telemetry signals
-    FE & S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 -.->|OTLP| OTEL
+    FE & S1 & S2 & S3 & S4 & S5 & S6 & S7 & S8 & S9 -.->|OTLP| OTEL
+    FLAGD -.->|metrics| OTEL
     OTEL --> PROM & JAEG & OS
 
     %% Alerting flow
     PROM -->|rules eval| AM
     AM -->|webhook| WH
-    WH -->|RCA agent hooks here| WH
 
     %% Visualization
     GRAF -->|query| PROM & JAEG & OS
