@@ -2114,12 +2114,76 @@ services:
     depends_on:
       - flagd
     metrics:
-      - name: app_payment_transactions_total   
+      - name: app_payment_transactions_total
         type: counter
         category: custom
         labels:
           service_name: [payment]
           app_payment_currency: []  # high-cardinality currency codes
+
+      - name: nodejs_eventloop_delay_max_seconds
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [payment]
+
+      - name: nodejs_eventloop_delay_mean_seconds
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [payment]
+
+      - name: nodejs_eventloop_delay_min_seconds
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [payment]
+
+      - name: nodejs_eventloop_delay_p50_seconds
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [payment]
+
+      - name: nodejs_eventloop_delay_p90_seconds
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [payment]
+
+      - name: nodejs_eventloop_delay_p99_seconds
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [payment]
+
+      - name: nodejs_eventloop_delay_stddev_seconds
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [payment]
+
+      - name: nodejs_eventloop_time_seconds_total
+        type: counter
+        category: runtime
+        labels:
+          service_name: [payment]
+          nodejs_eventloop_state: [active, idle]
+
+      - name: nodejs_eventloop_utilization_ratio
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [payment]
+
+      - name: target_info
+        type: gauge
+        category: meta
+        labels:
+          service_name: [payment]
+          telemetry_sdk_language: [nodejs]
+          telemetry_sdk_name: [opentelemetry]
+          process_runtime_name: [nodejs]
     logs:
       source: opensearch
       index_pattern: "otel-logs-*"
