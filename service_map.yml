@@ -2114,12 +2114,55 @@ services:
     depends_on:
       - flagd
     metrics:
+      - name: traces_span_metrics_duration_milliseconds
+        type: histogram
+        category: golden_signal
+        labels:
+          service_name: [payment]
+          span_kind: [SPAN_KIND_CLIENT, SPAN_KIND_INTERNAL, SPAN_KIND_SERVER]
+          span_name:
+            - charge
+            - dns.lookup
+            - "flagd.evaluation.v2.Service/EventStream"
+            - "flagd.evaluation.v2.Service/ResolveFloat"
+            - "oteldemo.PaymentService/Charge"
+            - tcp.connect
+          status_code: [STATUS_CODE_ERROR, STATUS_CODE_UNSET]
+          le: []  # histogram bucket boundary
+
+      - name: traces_span_metrics_calls_total
+        type: counter
+        category: golden_signal
+        labels:
+          service_name: [payment]
+          span_kind: [SPAN_KIND_CLIENT, SPAN_KIND_INTERNAL, SPAN_KIND_SERVER]
+          span_name:
+            - charge
+            - dns.lookup
+            - "flagd.evaluation.v2.Service/EventStream"
+            - "flagd.evaluation.v2.Service/ResolveFloat"
+            - "oteldemo.PaymentService/Charge"
+            - tcp.connect
+          status_code: [STATUS_CODE_ERROR, STATUS_CODE_UNSET]
+
       - name: app_payment_transactions_total
         type: counter
         category: custom
         labels:
           service_name: [payment]
           app_payment_currency: []  # high-cardinality currency codes
+
+      # NOTE: payment uses legacy OTel HTTP semantic conventions (milliseconds suffix,
+      # net_peer_name label). These are internal OTel SDK calls (to otel-collector and
+      # metadata endpoints), not business traffic.
+      - name: http_client_duration_milliseconds
+        type: histogram
+        category: golden_signal
+        labels:
+          service_name: [payment]
+          http_method: [GET, POST]
+          net_peer_name: []  # high-cardinality (otel-collector, 169.254.169.254, metadata.google.internal.)
+          le: []  # histogram bucket boundary
 
       - name: nodejs_eventloop_delay_max_seconds
         type: gauge
@@ -2176,6 +2219,86 @@ services:
         labels:
           service_name: [payment]
 
+      - name: v8js_gc_duration_seconds
+        type: histogram
+        category: runtime
+        labels:
+          service_name: [payment]
+          v8js_gc_type: [incremental, major, minor]
+          le: []  # histogram bucket boundary
+
+      - name: v8js_memory_heap_limit_bytes
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [payment]
+          v8js_heap_space_name:
+            - code_large_object_space
+            - code_space
+            - large_object_space
+            - new_large_object_space
+            - new_space
+            - old_space
+            - read_only_space
+            - shared_large_object_space
+            - shared_space
+            - trusted_large_object_space
+            - trusted_space
+
+      - name: v8js_memory_heap_space_available_size_bytes
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [payment]
+          v8js_heap_space_name:
+            - code_large_object_space
+            - code_space
+            - large_object_space
+            - new_large_object_space
+            - new_space
+            - old_space
+            - read_only_space
+            - shared_large_object_space
+            - shared_space
+            - trusted_large_object_space
+            - trusted_space
+
+      - name: v8js_memory_heap_space_physical_size_bytes
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [payment]
+          v8js_heap_space_name:
+            - code_large_object_space
+            - code_space
+            - large_object_space
+            - new_large_object_space
+            - new_space
+            - old_space
+            - read_only_space
+            - shared_large_object_space
+            - shared_space
+            - trusted_large_object_space
+            - trusted_space
+
+      - name: v8js_memory_heap_used_bytes
+        type: gauge
+        category: runtime
+        labels:
+          service_name: [payment]
+          v8js_heap_space_name:
+            - code_large_object_space
+            - code_space
+            - large_object_space
+            - new_large_object_space
+            - new_space
+            - old_space
+            - read_only_space
+            - shared_large_object_space
+            - shared_space
+            - trusted_large_object_space
+            - trusted_space
+
       - name: target_info
         type: gauge
         category: meta
@@ -2183,7 +2306,10 @@ services:
           service_name: [payment]
           telemetry_sdk_language: [nodejs]
           telemetry_sdk_name: [opentelemetry]
+          telemetry_sdk_version: ["2.6.1"]
           process_runtime_name: [nodejs]
+          process_runtime_version: ["22.22.0"]
+
     logs:
       source: opensearch
       index_pattern: "otel-logs-*"
@@ -2202,16 +2328,23 @@ services:
       trace_id_field: traceId
       span_id_field: spanId
       key_attribute_fields:
+        # charge.js logs these on every transaction: logger.info({transactionId, cardType, lastFourDigits, amount, loyalty_level})
         - attributes.transactionId
         - attributes.cardType
         - attributes.lastFourDigits
         - attributes.amount
         - attributes.loyalty_level
+
     traces:
       jaeger_service: payment
       server_operations:
         - oteldemo.PaymentService/Charge
-      client_operations: []
+        - charge
+      client_operations:
+        - "flagd.evaluation.v2.Service/EventStream"
+        - "flagd.evaluation.v2.Service/ResolveFloat"
+        - dns.lookup
+        - tcp.connect
       error_tag: error
       lookback_default_minutes: 30
 
