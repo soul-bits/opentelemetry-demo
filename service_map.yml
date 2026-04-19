@@ -341,7 +341,6 @@ services:
         - oteldemo.CheckoutService/PlaceOrder
         - oteldemo.ProductCatalogService/GetProduct
         - oteldemo.RecommendationService/ListRecommendations
-        - oteldemo.AdService/GetAds
       error_tag: error
       lookback_default_minutes: 30
 
@@ -558,6 +557,8 @@ services:
         - oteldemo.CurrencyService/Convert
         - oteldemo.PaymentService/Charge
         - oteldemo.ProductCatalogService/GetProduct
+        - POST /get-quote
+        - POST /ship-order
       error_tag: error
       lookback_default_minutes: 30
 
@@ -593,7 +594,7 @@ services:
           http_request_method: [POST]
           url_scheme: [http]
 
-      # app_cart_* metrics indirectly reflect redis round-trip latency
+      # app_cart_* metrics indirectly reflect valkey round-trip latency
       - name: app_cart_add_item_latency_seconds
         type: histogram
         category: custom
@@ -969,7 +970,7 @@ services:
     depends_on:
       - quote
     metrics:
-      # Rust service exposes HTTP server metrics despite grpc in protocol field
+      # Rust service exposes HTTP server metrics
       - name: http_server_duration_seconds
         type: histogram
         category: golden_signal
@@ -1589,8 +1590,11 @@ services:
     traces:
       jaeger_service: product-reviews
       server_operations:
+        - ProductReviewService/GetProductReviews
+        - ProductReviewService/GetAverageProductReviewScore
+        - ProductReviewService/AskProductAIAssistant
+      client_operations:
         - flagd.evaluation.v1.Service/EventStream
-      client_operations: []
       error_tag: error
       lookback_default_minutes: 30
 
@@ -2158,6 +2162,8 @@ services:
         - cart          # feature_flag_evaluation_* metrics on cart reflect flagd flag evaluations
         - recommendation  # flagd.evaluation.v1.Service/ResolveBoolean client spans on recommendation
         - productreviews  # flagd.evaluation.v1.Service/EventStream client spans on product-reviews
+        - payment       # charge.js uses @openfeature/flagd-provider for paymentFailure flag
+        - checkout      # main.go initializes FlagdProvider for checkout feature flags
     logs: null
     traces:
       jaeger_service: flagd
