@@ -2114,7 +2114,7 @@ services:
     depends_on:
       - flagd
     metrics:
-      - name: app_payment_transactions
+      - name: app_payment_transactions_total   
         type: counter
         category: custom
         labels:
