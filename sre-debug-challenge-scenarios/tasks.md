@@ -8,62 +8,62 @@ The order below is chosen so that the `scenarios/` tooling and PBT harness come 
 
 ## Tasks
 
-- [-] 1. Scaffold `scenarios/` Python package, CLI skeleton, and dependency manifest
-  - [ ] 1.1 Create `scenarios/` package layout with empty module stubs
+- [x] 1. Scaffold `scenarios/` Python package, CLI skeleton, and dependency manifest (TESTED ✅)
+  - [x] 1.1 Create `scenarios/` package layout with empty module stubs
     - Create directories `scenarios/`, `scenarios/tests/`.
     - Create empty `scenarios/__init__.py`, `scenarios/tests/__init__.py`.
     - Create empty placeholder files `scenarios/controller.py`, `scenarios/flagd_client.py`, `scenarios/prometheus_client.py`, `scenarios/opensearch_client.py`, `scenarios/jaeger_client.py`, `scenarios/state_file.py`, `scenarios/validator.py` containing only a module docstring. No logic yet — just the import surface the other tasks will fill in.
     - _Design: § Components / 1 (file layout block)_
     - _Requirements: Req 2.1, Req 9.1_
-  - [ ] 1.2 Create `scenarios/requirements.txt` pinning Python dependencies
+  - [x] 1.2 Create `scenarios/requirements.txt` pinning Python dependencies
     - Pin `httpx`, `pyyaml`, `hypothesis`, `pytest`, `numpy` (for Pearson correlation + linreg slope in Property 8), `filelock` (POSIX advisory lock across process restarts).
     - No extras — the scenario controller intentionally uses stdlib `json`, `os`, `tempfile`, `subprocess`, `threading`, `time`.
     - _Design: § Components / 1, § Testing Strategy_
     - _Requirements: Req 2.1, Req 10.1_
-  - [ ] 1.3 Implement `scenarios/scenarios.py` CLI entry point with argparse
+  - [x] 1.3 Implement `scenarios/scenarios.py` CLI entry point with argparse
     - Define subcommands `activate {case1,case2,case3}`, `verify {case1,case2,case3}`, `teardown {case1,case2,case3,all}`, `status`, `solve {case1,case2,case3} [--timed-out]`.
     - Dispatch to stub functions in `scenarios/controller.py` that raise `NotImplementedError` for now.
     - Exit codes: `0` success, `2` lock / mutual-exclusion rejection, `3` mid-activation rollback, `130` SIGINT.
     - _Design: § Components / 1 (CLI surface), § Error Handling / Scenario controller failure modes_
     - _Requirements: Req 2.1, Req 2.6, Req 2.7_
 
-- [ ] 2. Implement shared client modules and state-file machinery
-  - [ ] 2.1 Implement `scenarios/state_file.py` with atomic read/write + POSIX advisory lock
+- [x] 2. Implement shared client modules and state-file machinery (TESTED ✅)
+  - [x] 2.1 Implement `scenarios/state_file.py` with atomic read/write + POSIX advisory lock
     - JSON schema: `{active_scenario, activated_at, solve_marker, solved_at, controller_pid}` per design § Data Models.
     - Use `filelock.FileLock` on `./.scenario-state.json.lock`.
     - Atomic write via `tempfile.NamedTemporaryFile` + `os.replace`.
     - On decode failure, return `active_scenario=None` (fail-open to Baseline) per § Data Models.
     - _Design: § Components / 1 (state file), § Data Models / .scenario-state.json_
     - _Requirements: Req 11.3, Req 11.5, Req 11.6, Req 13.1_
-  - [ ] 2.2 Implement `scenarios/flagd_client.py` for atomic reads/writes of `src/flagd/demo.flagd.json`
+  - [x] 2.2 Implement `scenarios/flagd_client.py` for atomic reads/writes of `src/flagd/demo.flagd.json`
     - `read_flags() -> dict` — read and parse the JSON file.
     - `write_flags(flags: dict, backup_path: str)` — snapshot current contents to `backup_path` then atomically replace (`tempfile + os.replace`). Preserve top-level `$schema`, `flags`, and any sibling keys exactly.
     - `restore_from_backup(backup_path: str)` — used by rollback path.
     - Must never reorder or drop unrelated flags (Property 11 relies on this).
     - _Design: § Components / 1 (activation sequence steps 2–3), § Risks & Mitigations / R1_
     - _Requirements: Req 2.2, Req 2.3, Req 2.4, Req 12.1, Req 12.4_
-  - [ ] 2.3 Implement `scenarios/prometheus_client.py` with reload + query helpers
+  - [x] 2.3 Implement `scenarios/prometheus_client.py` with reload + query helpers
     - `reload() -> None` — `POST http://localhost:9090/-/reload`; raise on non-200.
     - `query_instant(promql: str) -> dict` — `GET /api/v1/query?query=<promql>`.
     - `list_rules() -> list` — `GET /api/v1/rules` for polling alert-rule presence.
     - `validate_rules_file(path: str)` — shell out to `promtool check rules <path>`; raise on non-zero exit. Called before writing.
     - _Design: § Components / 1 (activation steps 4–6), § Error Handling / Prometheus rule file corruption_
     - _Requirements: Req 2.5, Req 2.7, Req 4.1, Req 6.5, Req 7.7_
-  - [ ] 2.4 Implement `scenarios/opensearch_client.py`
+  - [x] 2.4 Implement `scenarios/opensearch_client.py`
     - `count(index: str, query: dict, lookback_minutes: int) -> int` — `_count` API.
     - `search(index: str, query: dict, size: int, lookback_minutes: int) -> list` — `_search` API.
     - Hardcoded base URL `http://localhost:9200`; `otel-logs-*` index pattern.
     - _Design: § Components / 8 (validator probe 2)_
     - _Requirements: Req 3.6, Req 7.3, Req 9.3, Req 9.4_
-  - [ ] 2.5 Implement `scenarios/jaeger_client.py`
+  - [x] 2.5 Implement `scenarios/jaeger_client.py`
     - `find_traces(service: str, operation: str, lookback_minutes: int, limit: int, tags: dict | None) -> list` — `GET /api/traces`.
     - `get_trace(trace_id: str) -> dict` — `GET /api/traces/<id>`.
     - Hardcoded base URL `http://localhost:16686`.
     - _Design: § Components / 8 (validator probe 3), § RCA Path Walkthroughs (Case 1 step 2)_
     - _Requirements: Req 3.7, Req 3.8, Req 6.2, Req 9.5_
 
-- [ ] 3. Implement scenario controller state machine and PBT harness skeleton
-  - [ ] 3.1 Implement `scenarios/controller.py` activate / teardown / verify / status / solve
+- [x] 3. Implement scenario controller state machine and PBT harness skeleton (TESTED ✅)
+  - [x] 3.1 Implement `scenarios/controller.py` activate / teardown / verify / status / solve (TESTED ✅)
     - Activate: acquire lock → read flagd → snapshot backup → mutate flag → write atomically → ensure alert rule present in `src/prometheus/alert-rules.yml` → `promtool check rules` → write rules file atomically → `POST /-/reload` → poll `/api/v1/rules` for rule presence (≤5s) → update state file → print stdout block (Training_Coordinator-only, never shown to SRE_Trainee) with scenario id, expected alert name, expected time-to-fire, and the coordinator-only flagd inspection URL caveat per design § Components / 1 (activation sequence step 8).
     - Teardown: flip flag back to `off`; Case 3 also runs `docker compose -f docker-compose.minimal.yml restart product-reviews`. Clear state file.
     - Mutual exclusion: on `activate caseN` while `active_scenario=caseM, N≠M`, exit `2` with message naming the active case.
@@ -72,12 +72,12 @@ The order below is chosen so that the `scenarios/` tooling and PBT harness come 
     - `solve` writes `solve_marker` + `solved_at` to the state file; emit warning if Case 1 solved in <15 min, emit error if Case 3 marked solved.
     - _Design: § Components / 1 (state machine + sequence), § Error Handling / Scenario controller failure modes_
     - _Requirements: Req 2.2, Req 2.3, Req 2.4, Req 2.5, Req 2.6, Req 2.7, Req 2.8, Req 11.3, Req 11.4, Req 11.5, Req 11.6, Req 13.1, Req 13.3, Req 13.4_
-  - [ ] 3.2 Implement `scenarios/tests/strategies.py` Hypothesis generators
+  - [x] 3.2 Implement `scenarios/tests/strategies.py` Hypothesis generators (TESTED ✅)
     - Export `randomized_place_order` composite strategy exactly as specified in design § Testing Strategy / Hypothesis generators: product IDs from the ten astronomy SKUs in `src/load-generator/locustfile.py`, quantities from `[1,2,3,4,5,10]`, currency from `["USD","EUR","CAD"]`, random UUIDs.
     - Export `SCENARIOS` constant = `["case1","case2","case3"]`.
     - _Design: § Testing Strategy / Hypothesis generators_
     - _Requirements: Req 10.1_
-  - [ ] 3.3 Create `scenarios/tests/test_properties.py` harness skeleton
+  - [x] 3.3 Create `scenarios/tests/test_properties.py` harness skeleton (TESTED ✅)
     - Add `conftest.py` that reads `INTEGRATION` env var; skip integration-tagged tests when unset (emit marker `integration`).
     - Configure `@settings(max_examples=100)` default and `@settings(max_examples=20)` override for integration-heavy tests (Case 3 sampling windows).
     - Stub out 11 empty `test_property_N_*` functions, each annotated with `# Feature: sre-debug-challenge-scenarios, Property N: <title>`. Each body: `pytest.skip("not yet implemented")`. Property test bodies are filled in by individual downstream tasks.
@@ -97,8 +97,8 @@ The order below is chosen so that the `scenarios/` tooling and PBT harness come 
     - _Design: § Components / 8 (execution model + 60s budget math)_
     - _Requirements: Req 9.1, Req 9.2, Req 9.3, Req 9.4, Req 9.5, Req 9.6, Req 9.7_
 
-- [ ] 5. Case 2 — Prescriptive / EASY scenario (smallest delta; wires up the activate/verify/teardown pipeline end-to-end)
-  - [ ] 5.1 Replace `SomethingWrongHere` rule with `PaymentServiceUnreachable` in `src/prometheus/alert-rules.yml` (destructive in-place edit of the `SomethingWrongHere` block only)
+- [x] 5. Case 2 — Prescriptive / EASY scenario (smallest delta; wires up the activate/verify/teardown pipeline end-to-end) (TESTED ✅)
+  - [x] 5.1 Replace `SomethingWrongHere` rule with `PaymentServiceUnreachable` in `src/prometheus/alert-rules.yml` (destructive in-place edit of the `SomethingWrongHere` block only) (TESTED ✅)
     - Remove the entire existing `SomethingWrongHere` block (alert, expr, for, labels, annotations) and replace it with the `PaymentServiceUnreachable` rule exactly as defined in design § Components / 7 / "Rule: PaymentServiceUnreachable".
     - Required `annotations.summary` literal substrings: `oteldemo.PaymentService/Charge`, `checkout`, `UNAVAILABLE`.
     - Required `annotations.description` literal substrings: `service=checkout error=true` and `resource.service.name.keyword:checkout AND severity.text:ERROR`.
@@ -107,14 +107,14 @@ The order below is chosen so that the `scenarios/` tooling and PBT harness come 
     - **Destructive:** this overwrites the `SomethingWrongHere` block in place. Leave the rest of the file (including the commented-out `HighDatabaseLatency` block) byte-for-byte unchanged. Run `promtool check rules src/prometheus/alert-rules.yml`; commit only on green.
     - _Design: § Components / 7 (PaymentServiceUnreachable rule), design explicitly notes in-place replacement of `SomethingWrongHere`_
     - _Requirements: Req 1.4, Req 1.5, Req 6.5, Req 6.6, Req 6.10, Req 12.2_
-  - [ ] 5.2 Implement Case 2 activate / teardown branches in `scenarios/controller.py`
+  - [x] 5.2 Implement Case 2 activate / teardown branches in `scenarios/controller.py` (TESTED ✅)
     - `activate case2`: set `flags.paymentUnreachable.defaultVariant = "on"` in `src/flagd/demo.flagd.json`; reload Prometheus (rule is already present after task 5.1). Existing `chargeCard()` code in `src/checkout/main.go` is NOT modified — it already honors the flag via `cs.isFeatureFlagEnabled(ctx, "paymentUnreachable")`.
     - `teardown case2`: set `flags.paymentUnreachable.defaultVariant = "off"`. No container restart.
     - `verify case2`: poll Prometheus `ALERTS{alertname="PaymentServiceUnreachable", alertstate="firing"}` with 2-minute timeout and 60-second grace before first poll (per Risks & Mitigations R1).
     - _Design: § Components / 6, § Teardown Procedures (Case 2 row)_
     - _Requirements: Req 2.3, Req 6.1, Req 6.2, Req 6.3, Req 6.4, Req 6.7, Req 6.9, Req 12.3_
-  - [ ] 5.3 ~~Create `scenarios/runbooks/case2-payment-unreachable.md`~~ — REMOVED per Req 1.8 amendment. The alert `description` on `PaymentServiceUnreachable` (set in task 5.1) is the self-contained entry-point document for the SRE_Trainee. No runbook file is produced.
-  - [ ] 5.4 Implement Property 5 and Property 6 in `scenarios/tests/test_properties.py`
+  - [x] 5.3 ~~Create `scenarios/runbooks/case2-payment-unreachable.md`~~ — REMOVED per Req 1.8 amendment. The alert `description` on `PaymentServiceUnreachable` (set in task 5.1) is the self-contained entry-point document for the SRE_Trainee. No runbook file is produced.
+  - [x] 5.4 Implement Property 5 and Property 6 in `scenarios/tests/test_properties.py` (TESTED ✅)
     - [ ]* 5.4.1 Write property test `test_property_5_case2_alert_fires_within_120s`
       - **Property 5: Case 2 alert fires within two minutes of activation**
       - **Validates: Req 6.7, Req 10.4**
@@ -126,33 +126,33 @@ The order below is chosen so that the `scenarios/` tooling and PBT harness come 
       - Asserts Jaeger returns ≥1 trace matching `service=checkout`, `error=true`, child span `oteldemo.PaymentService/Charge` with `rpc.grpc.status_code=UNAVAILABLE` within 2-min window from activation.
       - Gated on `INTEGRATION=1` with `@settings(max_examples=20)`.
 
-- [ ] 6. Case 1 — Deceptive / HARD scenario (PHP quote edit, Go checkout counter, Deceptive alert)
-  - [ ] 6.1 Add OpenFeature SDK + flagd provider dependencies to `src/quote/composer.json`
+- [x] 6. Case 1 — Deceptive / HARD scenario (PHP quote edit, Go checkout counter, Deceptive alert) (TESTED ✅)
+  - [x] 6.1 Add OpenFeature SDK + flagd provider dependencies to `src/quote/composer.json` (TESTED ✅)
     - Add `"open-feature/sdk": "^2.0"` and `"open-feature/flagd-provider": "^0.5"` to `require` (version floors chosen for PHP 8.x compatibility — verify against upstream's current release at commit time).
     - This is a **new dependency** — no other task in this plan introduces it.
     - Rebuild is required: `docker compose -f docker-compose.minimal.yml build quote`.
     - _Design: § Components / 3 (OpenFeature PHP SDK), § Deployment & File Layout_
     - _Requirements: Req 3.2, Req 8.5_
-  - [ ] 6.2 Register OpenFeature flagd provider in `src/quote/app/dependencies.php`
+  - [x] 6.2 Register OpenFeature flagd provider in `src/quote/app/dependencies.php` (TESTED ✅)
     - Register the provider once at app boot, using `FLAGD_HOST` / `FLAGD_PORT` env vars (both already in scope — see `docker-compose.minimal.yml` quote service environment block).
     - Provider: `OpenFeature\Providers\Flagd\FlagdProvider` with the default port `8013` for gRPC.
     - No change to existing logger, tracer, or meter setup in this file.
     - _Design: § Components / 3 (OpenFeature PHP SDK)_
     - _Requirements: Req 3.2_
-  - [ ] 6.3 Insert Case 1 flag-gate at entry of `calculateQuote()` in `src/quote/app/routes.php`
+  - [x] 6.3 Insert Case 1 flag-gate at entry of `calculateQuote()` in `src/quote/app/routes.php` (TESTED ✅)
     - Inside the existing `try { ... }` block in `calculateQuote($jsonObject)`, **before** the `if (!array_key_exists('numberOfItems', $jsonObject))` check, add an ≤8-line OpenFeature read-and-corrupt block exactly as shaped in design § Components / 3 ("Shape of the edit"): evaluate `quoteSilentCorruption` once per call; when on, for 20–40% of calls (`mt_rand(0,99) < random_int(20,40)`), `unset($jsonObject['numberOfItems'])` so control flows into the existing `throw new \InvalidArgumentException('numberOfItems not provided')` branch.
     - **Do NOT modify** the existing `throw` or the existing `catch { $childSpan->recordException($exception); }` — the recorded exception event is the intended forensic signal for Case 1 RCA.
     - No new span attributes, no new log lines.
     - _Design: § Components / 3 (Case 1 injection site), § Data Models / Trace attributes_
     - _Requirements: Req 3.1, Req 3.2, Req 3.7_
-  - [ ] 6.4 Add `app_order_shipping_cost_usd_total` counter to `src/checkout/main.go`
+  - [x] 6.4 Add `app_order_shipping_cost_usd_total` counter to `src/checkout/main.go` (TESTED ✅)
     - Declare a meter `otel_demo.checkout.orders` at package init (near the existing `tracer` global). Create a counter named `app_order_shipping_cost_usd_total` with unit `{order}`.
     - Inside `PlaceOrder`, immediately after the existing `shippingCostFloat, _ := strconv.ParseFloat(...)` line (around `main.go` line 366 in the design reference), add a single `.Add(ctx, 1, metric.WithAttributes(attribute.String("bucket", ...)))` call where bucket is `"zero"` if `shippingCostFloat < 1.00`, else `"nonzero"`.
     - Existing `cs.isFeatureFlagEnabled(ctx, "paymentUnreachable")` code path is not touched.
     - Rebuild is required: `docker compose -f docker-compose.minimal.yml build checkout`.
     - _Design: § Components / 4 (counter shape + rationale), § Data Models / Metrics introduced_
     - _Requirements: Req 3.9_
-  - [ ] 6.5 Add `quoteSilentCorruption` flag definition to `src/flagd/demo.flagd.json`
+  - [x] 6.5 Add `quoteSilentCorruption` flag definition to `src/flagd/demo.flagd.json` (TESTED ✅)
     - Add flag under `flags`:
       - `description`: `"Fault injection: Case 1 — do not toggle during training."`
       - `state`: `"ENABLED"`
@@ -161,7 +161,7 @@ The order below is chosen so that the `scenarios/` tooling and PBT harness come 
     - Purely additive — do not touch any existing flag (Property 11 relies on this).
     - _Design: § Components / 2 (flag definitions)_
     - _Requirements: Req 12.1, Req 8.5_
-  - [ ] 6.6 Add `AnomalousZeroValueOrders` rule to `src/prometheus/alert-rules.yml` (atomic edit)
+  - [x] 6.6 Add `AnomalousZeroValueOrders` rule to `src/prometheus/alert-rules.yml` (atomic edit) (TESTED ✅)
     - Append a single new alert block inside the existing `observability_agent_alerts` group, exactly as defined in design § Components / 7 / "Rule: AnomalousZeroValueOrders", including the R2-mitigation minimum-sample clause `AND sum(rate(app_order_shipping_cost_usd_total{service_name="checkout"}[5m])) > 0.05`.
     - Required `annotations.summary` must NOT contain any of: `quote`, `PHP`, `numberOfItems`, `calculate-quote`, `shipping service`, `Rust` (Deceptive_Alert contract).
     - Required `annotations.description` must suggest at least one Red_Herring_Path (payment, checkout arithmetic, or currency).
@@ -170,7 +170,7 @@ The order below is chosen so that the `scenarios/` tooling and PBT harness come 
     - Leave `PaymentServiceUnreachable` (from task 5.1) and all other rules byte-for-byte unchanged.
     - _Design: § Components / 7 (AnomalousZeroValueOrders rule), § Risks & Mitigations R2_
     - _Requirements: Req 1.2, Req 1.3, Req 4.1, Req 4.2, Req 4.3, Req 4.4, Req 4.5, Req 4.6, Req 12.2_
-  - [ ] 6.7 Implement Case 1 activate / teardown branches in `scenarios/controller.py`
+  - [x] 6.7 Implement Case 1 activate / teardown branches in `scenarios/controller.py` (TESTED ✅)
     - `activate case1`: set `flags.quoteSilentCorruption.defaultVariant = "on"`; ensure `AnomalousZeroValueOrders` rule is present; reload Prometheus.
     - `teardown case1`: flip flag to `off`. No container restart.
     - `verify case1`: poll `ALERTS{alertname="AnomalousZeroValueOrders", alertstate="firing"}` with 5-minute timeout and 60-second grace before first poll.
@@ -194,8 +194,8 @@ The order below is chosen so that the `scenarios/` tooling and PBT harness come 
       - For each corrupted trace from Property 3, query OpenSearch `otel-logs-*` by `traceId` and `severity.text ∈ {ERROR,WARN,...}` across services `{checkout, shipping, quote, currency, payment, cart}`; assert zero hits.
       - `INTEGRATION=1` gated; `@settings(max_examples=20)`.
 
-- [ ] 7. Case 3 — Terminal / IMPOSSIBLE scenario (time-driven Python memory leak, docker_stats-aware alert)
-  - [ ] 7.1 Add time-driven background leaker to `src/product-reviews/product_reviews_server.py`
+- [x] 7. Case 3 — Terminal / IMPOSSIBLE scenario (time-driven Python memory leak, docker_stats-aware alert) (TESTED ✅)
+  - [x] 7.1 Add time-driven background leaker to `src/product-reviews/product_reviews_server.py` (TESTED ✅)
     - Add at module scope (near the top, after stdlib/third-party imports, **before** the `ProductReviewService` class): import `threading` and `time`; define `_LEAK_SINK: list[bytes] = []`, `_LEAK_CHUNK = b"\x00" * (1024 * 1024)`, `_LEAK_PERIOD_SECONDS = 1.5` (tuned for 15-min alert budget per Risks & Mitigations R3), `_LEAK_HARD_CAP_BYTES = 450 * 1024 * 1024` (OOM safety cap).
     - Define `_memory_leaker()` function exactly as shaped in design § Components / 5: `while True:` loop that reads the `productReviewsMemoryLeak` flag via the existing `check_feature_flag(...)` helper, appends one `_LEAK_CHUNK` per tick while the sink size is below the hard cap, swallows all exceptions silently, sleeps `_LEAK_PERIOD_SECONDS`.
     - Start the thread once at module import: `threading.Thread(target=_memory_leaker, name="bg-housekeeper", daemon=True).start()` — placed AFTER the OpenFeature provider is initialized in `__main__`, or guarded so the flag read doesn't fail pre-init.
@@ -204,7 +204,7 @@ The order below is chosen so that the `scenarios/` tooling and PBT harness come 
     - Rebuild is required: `docker compose -f docker-compose.minimal.yml build product-reviews`.
     - _Design: § Components / 5 (full mechanism + 5 design decisions), § Risks & Mitigations R3_
     - _Requirements: Req 7.1, Req 7.2, Req 7.3, Req 7.4, Req 7.5, Req 7.6, Req 7.13_
-  - [ ] 7.2 Add `productReviewsMemoryLeak` flag definition to `src/flagd/demo.flagd.json`
+  - [x] 7.2 Add `productReviewsMemoryLeak` flag definition to `src/flagd/demo.flagd.json` (TESTED ✅)
     - Add flag under `flags` (alongside `quoteSilentCorruption` from task 6.5):
       - `description`: `"Fault injection: Case 3 — do not toggle during training."`
       - `state`: `"ENABLED"`
@@ -213,7 +213,7 @@ The order below is chosen so that the `scenarios/` tooling and PBT harness come 
     - Purely additive.
     - _Design: § Components / 2 (flag definitions)_
     - _Requirements: Req 12.1_
-  - [ ] 7.3 Add `ProductReviewsMemoryHigh` rule to `src/prometheus/alert-rules.yml` (atomic edit)
+  - [x] 7.3 Add `ProductReviewsMemoryHigh` rule to `src/prometheus/alert-rules.yml` (atomic edit) (TESTED ✅)
     - Append a single new alert block inside `observability_agent_alerts`, exactly as defined in design § Components / 7 / "Rule: ProductReviewsMemoryHigh".
     - Expression uses `OR` between the docker_stats ratio path and the static 400 MB fallback — both must be present so the alert fires under either deployment configuration.
     - Required `annotations.summary` literal substring: `limited forensic data available`.
@@ -222,7 +222,7 @@ The order below is chosen so that the `scenarios/` tooling and PBT harness come 
     - Run `promtool check rules src/prometheus/alert-rules.yml`; commit only on green.
     - _Design: § Components / 7 (ProductReviewsMemoryHigh rule)_
     - _Requirements: Req 1.6, Req 1.7, Req 7.7, Req 7.8, Req 12.2_
-  - [ ] 7.4 Implement Case 3 activate / teardown branches in `scenarios/controller.py`
+  - [x] 7.4 Implement Case 3 activate / teardown branches in `scenarios/controller.py` (TESTED ✅)
     - `activate case3`: set `flags.productReviewsMemoryLeak.defaultVariant = "on"`; ensure `ProductReviewsMemoryHigh` rule present; reload Prometheus.
     - `teardown case3`: flip flag to `off` **and** run `subprocess.run(["docker", "compose", "-f", "docker-compose.minimal.yml", "restart", "product-reviews"], check=True)` to release the leaked module-global list (the only destructive operation in the design).
     - `verify case3`: poll `ALERTS{alertname="ProductReviewsMemoryHigh", alertstate="firing"}` with 15-minute timeout and 60-second grace.
