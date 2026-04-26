@@ -685,7 +685,7 @@ services:
           memory: 175M
     restart: unless-stopped
     environment:
-      - "GF_INSTALL_PLUGINS=grafana-opensearch-datasource"
+      - "GF_INSTALL_PLUGINS=grafana-opensearch-datasource,marcusolsson-dynamictext-panel"
     volumes:
       - ./src/grafana/grafana.ini:/etc/grafana/grafana.ini
       - ./src/grafana/provisioning/:/etc/grafana/provisioning/
