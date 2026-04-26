@@ -7,7 +7,7 @@ groups:
     rules:
       # Payment service unreachable - checkout cannot charge customers
       # Trigger: set paymentUnreachable flag to "on" in src/flagd/demo.flagd.json
-      - alert: SomethingWrongHere # PaymentServiceUnreachable
+      - alert: SomethingWrong1 # PaymentServiceUnreachable
         expr: |
           (
             sum(rate(rpc_client_call_duration_seconds_count{service_name="checkout", rpc_response_status_code!="OK"}[5m])) by (service_name, rpc_method)
@@ -18,21 +18,19 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "Somethig is wrong"
-          description: "Don't know where wrong."
-          # summary: "Checkout downstream call failing: {{ $labels.rpc_method }}"
-          # description: "{{ $value | humanizePercentage }} of {{ $labels.rpc_method }} calls from checkout are failing"
+          summary: "Summary redaction 1"
+          description: "Description redaction 1"
 
       # High database operation latency on product-catalog
       # Indicates slow PostgreSQL queries — visible in Jaeger traces and DB metrics
-      # - alert: HighDatabaseLatency
-      #   expr: |
-      #     histogram_quantile(0.95,
-      #       sum(rate(db_client_operation_duration_seconds_bucket[5m])) by (le, service_name)
-      #     ) > 1.0
-      #   for: 2m
-      #   labels:
-      #     severity: warning
-      #   annotations:
-      #     summary: "High database latency on {{ $labels.service_name }}"
-      #     description: "P95 DB latency is {{ $value | humanizeDuration }} on {{ $labels.service_name }}"
+      - alert: SomethingWrong2
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(db_client_operation_duration_seconds_bucket[5m])) by (le, service_name)
+          ) > 1.0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Summary redaction 2"
+          description: "Description redaction 2"
