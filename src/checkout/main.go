@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"io"
 	"log/slog"
+	"math/rand"
 	"net"
 	"net/http"
 	"os"
@@ -20,6 +21,7 @@ import (
 
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/log/global"
+	"go.opentelemetry.io/otel/metric"
 	semconv "go.opentelemetry.io/otel/semconv/v1.24.0"
 	"go.opentelemetry.io/otel/trace"
 
@@ -64,6 +66,9 @@ import (
 
 var logger *slog.Logger
 var tracer trace.Tracer
+var meterProvider *sdkmetric.MeterProvider
+var shippingCostCounter metric.Int64Counter
+var placeOrderCallCounter metric.Int64Counter
 var resource *sdkresource.Resource
 var initResourcesOnce sync.Once
 
@@ -106,14 +111,16 @@ func initMeterProvider() *sdkmetric.MeterProvider {
 	exporter, err := otlpmetricgrpc.New(ctx)
 	if err != nil {
 		logger.Error(fmt.Sprintf("new otlp metric grpc exporter failed: %v", err))
+		meterProvider = sdkmetric.NewMeterProvider(sdkmetric.WithResource(initResource()))
+		return meterProvider
 	}
 
-	mp := sdkmetric.NewMeterProvider(
-		sdkmetric.WithReader(sdkmetric.NewPeriodicReader(exporter)),
+	meterProvider = sdkmetric.NewMeterProvider(
+		sdkmetric.WithReader(sdkmetric.NewPeriodicReader(exporter, sdkmetric.WithInterval(10*time.Second))),
 		sdkmetric.WithResource(initResource()),
 	)
-	otel.SetMeterProvider(mp)
-	return mp
+	otel.SetMeterProvider(meterProvider)
+	return meterProvider
 }
 
 func initLoggerProvider() *sdklog.LoggerProvider {
@@ -196,6 +203,32 @@ func main() {
 	openfeature.AddHooks(otelhooks.NewTracesHook())
 
 	tracer = tp.Tracer("checkout")
+
+	// Initialize metrics for Case 1
+	meter := mp.Meter("otel_demo.checkout.orders")
+	var err2 error
+
+	// Test counter to verify metric SDK is working
+	placeOrderCallCounter, err2 = meter.Int64Counter(
+		"test_place_order_calls_total",
+		metric.WithDescription("Test counter for PlaceOrder calls"),
+	)
+	if err2 != nil {
+		logger.Error(fmt.Sprintf("Error creating test counter: %v", err2))
+	} else {
+		logger.Info("Successfully created test counter")
+	}
+
+	shippingCostCounter, err2 = meter.Int64Counter(
+		"app_order_shipping_cost_usd_total",
+		metric.WithDescription("Total shipping cost per order"),
+		metric.WithUnit("{order}"),
+	)
+	if err2 != nil {
+		logger.Error(fmt.Sprintf("Error creating shipping cost counter: %v", err2))
+	} else {
+		logger.Info("Successfully created shipping cost counter")
+	}
 
 	svc := new(checkout)
 	svc.httpClient = &http.Client{
@@ -303,6 +336,11 @@ func (cs *checkout) PlaceOrder(ctx context.Context, req *pb.PlaceOrderRequest) (
 		slog.String("user_currency", req.UserCurrency),
 	)
 
+	// Record test metric to verify metric SDK is working
+	if placeOrderCallCounter != nil {
+		placeOrderCallCounter.Add(ctx, 1)
+	}
+
 	var err error
 	defer func() {
 		if err != nil {
@@ -363,6 +401,17 @@ func (cs *checkout) PlaceOrder(ctx context.Context, req *pb.PlaceOrderRequest) (
 	shippingCostFloat, _ := strconv.ParseFloat(fmt.Sprintf("%d.%02d", prep.shippingCostLocalized.GetUnits(), prep.shippingCostLocalized.GetNanos()/1000000000), 64)
 	totalPriceFloat, _ := strconv.ParseFloat(fmt.Sprintf("%d.%02d", total.GetUnits(), total.GetNanos()/1000000000), 64)
 
+	// Record shipping cost bucket for Case 1 property tests
+	bucket := "nonzero"
+	if shippingCostFloat < 1.00 {
+		bucket = "zero"
+	}
+	shippingCostCounter.Add(ctx, 1, metric.WithAttributes(attribute.String("bucket", bucket)))
+	span.SetAttributes(
+		attribute.String("app.shipping.cost.bucket", bucket),
+		attribute.Float64("app.shipping.cost.usd", shippingCostFloat),
+	)
+
 	span.SetAttributes(
 		attribute.String("app.order.id", orderID.String()),
 		attribute.Float64("app.shipping.amount", shippingCostFloat),
@@ -392,6 +441,10 @@ func (cs *checkout) PlaceOrder(ctx context.Context, req *pb.PlaceOrderRequest) (
 		cs.sendToPostProcessor(ctx, orderResult)
 	}
 
+	if meterProvider != nil {
+		meterProvider.ForceFlush(ctx)
+	}
+
 	resp := &pb.PlaceOrderResponse{Order: orderResult}
 	return resp, nil
 }
@@ -418,11 +471,19 @@ func (cs *checkout) prepareOrderItemsAndShippingQuoteFromCart(ctx context.Contex
 	}
 	shippingUSD, err := cs.quoteShipping(ctx, address, cartItems)
 	if err != nil {
-		return out, fmt.Errorf("shipping quote failure: %+v", err)
+		// On quote failure, silently record zero shipping (Case 1 fault injection)
+		shippingUSD = &pb.Money{CurrencyCode: "USD", Units: 0, Nanos: 0}
 	}
-	shippingPrice, err := cs.convertCurrency(ctx, shippingUSD, userCurrency)
-	if err != nil {
-		return out, fmt.Errorf("failed to convert shipping cost to currency: %+v", err)
+	var shippingPrice *pb.Money
+	// Skip currency conversion for zero amounts (currency service rejects them)
+	if shippingUSD.GetUnits() == 0 && shippingUSD.GetNanos() == 0 {
+		shippingPrice = &pb.Money{CurrencyCode: userCurrency, Units: 0, Nanos: 0}
+	} else {
+		var convErr error
+		shippingPrice, convErr = cs.convertCurrency(ctx, shippingUSD, userCurrency)
+		if convErr != nil {
+			return out, fmt.Errorf("failed to convert shipping cost to currency: %+v", convErr)
+		}
 	}
 
 	out.shippingCostLocalized = shippingPrice
@@ -456,6 +517,13 @@ func mustCreateClient(svcAddr string) *grpc.ClientConn {
 }
 
 func (cs *checkout) quoteShipping(ctx context.Context, address *pb.Address, items []*pb.CartItem) (*pb.Money, error) {
+	// Case 1 fault injection: silently return zero shipping cost without an error
+	if cs.isFeatureFlagEnabled(ctx, "quoteSilentCorruption") {
+		if rand.Intn(100) < 30 { // ~30% of orders get corrupted zero cost
+			return &pb.Money{CurrencyCode: "USD", Units: 0, Nanos: 0}, nil
+		}
+	}
+
 	quotePayload, err := json.Marshal(map[string]interface{}{
 		"address": address,
 		"items":   items,

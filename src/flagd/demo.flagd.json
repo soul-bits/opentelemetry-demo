@@ -103,7 +103,25 @@
         "on": true,
         "off": false
       },
+      "defaultVariant": "off"
+    },
+    "quoteSilentCorruption": {
+      "description": "Fault injection: AnomalousZeroValueOrders Alert: numberOfItems exception on calculate-quote.",
+      "state": "ENABLED",
+      "variants": {
+        "on": true,
+        "off": false
+      },
       "defaultVariant": "on"
+    },
+    "productReviewsMemoryLeak": {
+      "description": "Fault injection: forensic ceiling and asks for out-of-band instrumentation.",
+      "state": "ENABLED",
+      "variants": {
+        "on": true,
+        "off": false
+      },
+      "defaultVariant": "off"
     },
     "loadGeneratorFloodHomepage": {
       "description": "Flood the frontend with a large amount of requests.",

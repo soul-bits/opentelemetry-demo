@@ -65,9 +65,9 @@ groups:
       - alert: ResourceUtilizationWarning
         expr: |
           (
-            container_memory_usage_bytes{container_name="product-reviews"}
+            container_memory_usage_total_bytes{container_name="product-reviews"}
             /
-            (container_spec_memory_limit_bytes{container_name="product-reviews"} > 0)
+            container_memory_usage_limit_bytes{container_name="product-reviews"}
           ) > 0.85
           OR
           process_memory_usage_bytes{service_name="product-reviews"} > 400000000

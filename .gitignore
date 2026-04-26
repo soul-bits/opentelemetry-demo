@@ -10,12 +10,13 @@
 \#*\#
 
 docker-compose.override.yml
-
+human-sre-rca-playbook
 # Eclipse
 .classpath
 .project
 .settings
 
+src/flagd/demo.flagd.json
 bin/
 obj/
 .vs/

@@ -9,6 +9,8 @@ import os
 import json
 from concurrent import futures
 import random
+import threading
+import time
 
 # Pip
 import grpc
@@ -86,6 +88,27 @@ tools = [
           }
       }
 ]
+
+# Case 3: Background memory leak
+_LEAK_SINK = []
+_LEAK_CHUNK = b"\x00" * (1024 * 1024)  # 1 MB chunks
+_LEAK_PERIOD_SECONDS = 1.5
+_LEAK_HARD_CAP_BYTES = 450 * 1024 * 1024  # 450 MB safety cap
+
+
+def _memory_leaker():
+    """Background thread that leaks memory when productReviewsMemoryLeak flag is on."""
+    while True:
+        try:
+            from openfeature import api
+            flag_on = api.get_client().get_boolean_value('productReviewsMemoryLeak', False)
+            if flag_on and len(_LEAK_SINK) * len(_LEAK_CHUNK) < _LEAK_HARD_CAP_BYTES:
+                _LEAK_SINK.append(_LEAK_CHUNK)
+        except Exception:
+            # Silently swallow all exceptions
+            pass
+        time.sleep(_LEAK_PERIOD_SECONDS)
+
 
 class ProductReviewService(demo_pb2_grpc.ProductReviewServiceServicer):
     def GetProductReviews(self, request, context):
@@ -333,6 +356,9 @@ if __name__ == "__main__":
     service_name = must_map_env('OTEL_SERVICE_NAME')
 
     api.set_provider(FlagdProvider(host=os.environ.get('FLAGD_HOST', 'flagd'), port=os.environ.get('FLAGD_PORT', 8013)))
+
+    # Start Case 3 memory leaker thread
+    threading.Thread(target=_memory_leaker, name="bg-housekeeper", daemon=True).start()
 
     # Initialize Traces and Metrics
     tracer = trace.get_tracer_provider().get_tracer(service_name)
