@@ -7,7 +7,7 @@ groups:
     rules:
       # Payment service unreachable - checkout cannot charge customers
       # Trigger: set paymentUnreachable flag to "on" in src/flagd/demo.flagd.json
-      - alert: SomethingWrong1 # PaymentServiceUnreachable
+      - alert: SomethingWrongHere # PaymentServiceUnreachable
         expr: |
           (
             sum(rate(rpc_client_call_duration_seconds_count{service_name="checkout", rpc_response_status_code!="OK"}[5m])) by (service_name, rpc_method)
@@ -18,8 +18,67 @@ groups:
         labels:
           severity: critical
         annotations:
-          summary: "Summary redaction 1"
-          description: "Description redaction 1"
+          summary: "Somethig is wrong"
+          description: "Don't know where wrong."
+          # summary: "Checkout downstream call failing: {{ $labels.rpc_method }}"
+          # description: "{{ $value | humanizePercentage }} of {{ $labels.rpc_method }} calls from checkout are failing"
+
+      # Case 2 (EASY): Payment service unreachable - checkout cannot charge customers
+      # Trigger: set paymentUnreachable flag to "on" in src/flagd/demo.flagd.json
+      - alert: OperationalAnomalyDetected
+        expr: |
+          (
+            sum(rate(rpc_client_call_duration_seconds_count{service_name="checkout", rpc_response_status_code!="OK"}[5m])) by (service_name, rpc_method)
+            /
+            sum(rate(rpc_client_call_duration_seconds_count{service_name="checkout"}[5m])) by (service_name, rpc_method)
+          ) > 0.5
+        for: 1m
+        labels:
+          severity: critical
+          scenario: case2
+        annotations:
+          summary: "Alert"
+          description: |
+            Review system logs, traces, and metrics.
+
+      # Case 1 (HARD): Anomalous zero-value shipping costs on placed orders
+      # Trigger: set quoteSilentCorruption flag to "on" in src/flagd/demo.flagd.json
+      - alert: DataAnomalyWarning
+        expr: |
+          (
+            sum(rate(app_order_shipping_cost_usd_total{service_name="checkout", bucket="zero"}[5m]))
+            /
+            sum(rate(app_order_shipping_cost_usd_total{service_name="checkout"}[5m]))
+          ) > 0.1
+          AND sum(rate(app_order_shipping_cost_usd_total{service_name="checkout"}[5m])) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+          scenario: case1
+        annotations:
+          summary: "Data anomaly detected"
+          description: |
+            An anomaly in system data has been detected. Use traces, logs, and metrics to investigate the source and impact.
+
+      # Case 3 (IMPOSSIBLE): Product Reviews container memory high
+      # Trigger: set productReviewsMemoryLeak flag to "on" in src/flagd/demo.flagd.json
+      - alert: ResourceUtilizationWarning
+        expr: |
+          (
+            container_memory_usage_bytes{container_name="product-reviews"}
+            /
+            (container_spec_memory_limit_bytes{container_name="product-reviews"} > 0)
+          ) > 0.85
+          OR
+          process_memory_usage_bytes{service_name="product-reviews"} > 400000000
+        for: 5m
+        labels:
+          severity: warning
+          scenario: case3
+        annotations:
+          summary: "Resource utilization threshold exceeded"
+          description: |
+            A resource utilization threshold has been exceeded. Investigate affected services and resource allocation using available observability data.
 
       # Case 2 (EASY): Payment service unreachable - checkout cannot charge customers
       # Trigger: set paymentUnreachable flag to "on" in src/flagd/demo.flagd.json
@@ -80,14 +139,14 @@ groups:
 
       # High database operation latency on product-catalog
       # Indicates slow PostgreSQL queries — visible in Jaeger traces and DB metrics
-      - alert: SomethingWrong2
-        expr: |
-          histogram_quantile(0.95,
-            sum(rate(db_client_operation_duration_seconds_bucket[5m])) by (le, service_name)
-          ) > 1.0
-        for: 1m
-        labels:
-          severity: warning
-        annotations:
-          summary: "Summary redaction 2"
-          description: "Description redaction 2"
+      # - alert: HighDatabaseLatency
+      #   expr: |
+      #     histogram_quantile(0.95,
+      #       sum(rate(db_client_operation_duration_seconds_bucket[5m])) by (le, service_name)
+      #     ) > 1.0
+      #   for: 2m
+      #   labels:
+      #     severity: warning
+      #   annotations:
+      #     summary: "High database latency on {{ $labels.service_name }}"
+      #     description: "P95 DB latency is {{ $value | humanizeDuration }} on {{ $labels.service_name }}"
