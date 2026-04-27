@@ -25,11 +25,12 @@ groups:
             Review system logs, traces, and metrics.
 
       # Case 4 (MEDIUM): Latency degradation on a key recommendation service method
-      # Trigger: set recommendationLatencyDegradation flag to "on" in src/flagd/demo.flagd.json     
+      # Trigger: set recommendationLatencyDegradation flag to "on" in src/flagd/demo.flagd.json
       # Root cause is a cache policy change that causes more calls to the database, which is slower than the cache. 
-      # The alert is on the service latency degradation, not the database itself, because the database latency is still within acceptable thresholds and would not trigger a database-specific alert.
-      # The root cause is one hop deeper (cache policy) not the service itself                                                                         
-                                                                                                                                                                              
+      # The alert is on the service latency degradation, not the database itself, because the database latency is still
+      # within acceptable thresholds and would not trigger a database-specific alert.
+      # The root cause is one hop deeper (cache policy) not the service itself
+              
       - alert: ServiceLatencyDegradation
         expr: |
           (
@@ -42,12 +43,12 @@ groups:
               service_name="product-catalog"
             }[2m]))
           ) > 0.01
-        for: 0m                                                                                                                                                                                                                             
-        labels:                                   
-          severity: warning                                                                                                                                                                                            
-          scenario: case_medium    
+        for: 0m
+        labels:
+          severity: warning
+          scenario: case_medium
 
-                                                                                  
+  
       # Case (HARD): Cart service errors blocking user purchases
       # Trigger: set cartFailure flag to "on" in src/flagd/demo.flagd.json
       # Root cause is a silent data corruption issue that causes certain calls to the cart service to fail. 
@@ -60,15 +61,36 @@ groups:
             /
             sum(rate(traces_span_metrics_calls_total{service_name="cart"}[2m]))
           ) > 0.02
-        for: 0m                                                 
+        for: 0m 
         labels:
-          severity: warning                                                                                                                                                                                            
-          scenario: case_hard
-        annotations:                                                                                                                                                                                                   
-          summary: "Anomalous system behavior detected"         
-          # description: |                          
-          #   An unusual pattern has been detected in system behavior. Investigate using traces, metrics, and logs.                                        
-
+          severity: warning
+        annotations:
+          summary: "Anomalous system behavior detected"
+          description: |
+            An unusual pattern has been detected in system behavior. Investigate using traces, metrics, and logs.
+                          
+                       
+      # Case (VERY HARD): DB query latency spike caused by upstream cache exhaustion 
+      # Trigger: set recommendationCacheFailure flag to "on" in src/flagd/demo.flagd.json
+      # Root cause is a cache exhaustion issue in the recommendation service that causes increased load and latency on the database.
+      # The alert is on the database latency spike, not the cache exhaustion itself, because the cache does not have specific metrics 
+      # or logs associated with the exhaustion and would require deep investigation to identify.
+      - alert: InfrastructureResourceAnomaly            
+        expr: |            
+          histogram_quantile(0.95,                      
+            sum by(le)(    
+              rate(db_client_operation_duration_seconds_bucket{service_name="product-catalog"}[2m])                   
+            )              
+          ) > 4.0          
+        for: 0m                    
+        labels:            
+          severity: warning
+          scenario: case_very_hard                      
+        annotations:               
+          summary: "Infrastructure resource anomaly detected"
+          description: |   
+            An infrastructure-level anomaly has been detected. Investigate using available observability data.
+                         
       # # Case 1 (HARD): Anomalous zero-value shipping costs on placed orders
       # # Trigger: set quoteSilentCorruption flag to "on" in src/flagd/demo.flagd.json
       # - alert: DataAnomalyWarning
