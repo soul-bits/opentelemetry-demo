@@ -45,7 +45,29 @@ groups:
         for: 0m                                                                                                                                                                                                                             
         labels:                                   
           severity: warning                                                                                                                                                                                            
-          scenario: case_medium                                     
+          scenario: case_medium    
+
+                                                                                  
+      # Case (HARD): Cart service errors blocking user purchases
+      # Trigger: set cartFailure flag to "on" in src/flagd/demo.flagd.json
+      # Root cause is a silent data corruption issue that causes certain calls to the cart service to fail. 
+      # The alert is on the error rate increase, not the data corruption itself, because the corruption does
+      # not have specific metrics or logs associated with it and would require deep investigation to identify.
+      - alert: UserJourneyAnomalyDetected
+        expr: |
+          (
+            sum(rate(traces_span_metrics_calls_total{service_name="cart", status_code="STATUS_CODE_ERROR"}[2m]))
+            /
+            sum(rate(traces_span_metrics_calls_total{service_name="cart"}[2m]))
+          ) > 0.02
+        for: 0m                                                 
+        labels:
+          severity: warning                                                                                                                                                                                            
+          scenario: case_hard
+        annotations:                                                                                                                                                                                                   
+          summary: "Anomalous system behavior detected"         
+          # description: |                          
+          #   An unusual pattern has been detected in system behavior. Investigate using traces, metrics, and logs.                                        
 
       # # Case 1 (HARD): Anomalous zero-value shipping costs on placed orders
       # # Trigger: set quoteSilentCorruption flag to "on" in src/flagd/demo.flagd.json
