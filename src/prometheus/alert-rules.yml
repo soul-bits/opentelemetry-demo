@@ -25,7 +25,7 @@ groups:
           description: |
             Review system logs, traces, and metrics.
 
-      # Case 4 (MEDIUM): Latency degradation on a key recommendation service method
+      # Case (MEDIUM): Latency degradation on a key recommendation service method
       # Trigger: set recommendationLatencyDegradation flag to "on" in src/flagd/demo.flagd.json
       # Root cause : A specific product lookup in the product catalog is failing,
       # caused by the productCatalogFailure flag injecting errors for one product ID.  
@@ -91,46 +91,7 @@ groups:
           summary: "Infrastructure resource anomaly detected"
           description: |   
             An infrastructure-level anomaly has been detected. Investigate using available observability data.
-                         
-      # # Case 1 (HARD): Anomalous zero-value shipping costs on placed orders
-      # # Trigger: set quoteSilentCorruption flag to "on" in src/flagd/demo.flagd.json
-      # - alert: DataAnomalyWarning
-      #   expr: |
-      #     (
-      #       sum(rate(app_order_shipping_cost_usd_total{service_name="checkout", bucket="zero"}[5m]))
-      #       /
-      #       sum(rate(app_order_shipping_cost_usd_total{service_name="checkout"}[5m]))
-      #     ) > 0.1
-      #     AND sum(rate(app_order_shipping_cost_usd_total{service_name="checkout"}[5m])) > 0.05
-      #   for: 2m
-      #   labels:
-      #     severity: warning
-      #     scenario: case1
-      #   annotations:
-      #     summary: "Data anomaly detected"
-      #     description: |
-      #       An anomaly in system data has been detected. Use traces, logs, and metrics to investigate the source and impact.
-
-      # # Case 3 (IMPOSSIBLE): Product Reviews container memory high
-      # # Trigger: set productReviewsMemoryLeak flag to "on" in src/flagd/demo.flagd.json
-      # - alert: ResourceUtilizationWarning
-      #   expr: |
-      #     (
-      #       container_memory_usage_bytes{container_name="product-reviews"}
-      #       /
-      #       (container_spec_memory_limit_bytes{container_name="product-reviews"} > 0)
-      #     ) > 0.85
-      #     OR
-      #     process_memory_usage_bytes{service_name="product-reviews"} > 400000000
-      #   for: 5m
-      #   labels:
-      #     severity: warning
-      #     scenario: case3
-      #   annotations:
-      #     summary: "Resource utilization threshold exceeded"
-      #     description: |
-      #       A resource utilization threshold has been exceeded. Investigate affected services and resource allocation using available observability data.
-
+                  
       # High database operation latency on product-catalog
       # Indicates slow PostgreSQL queries — visible in Jaeger traces and DB metrics
       # - alert: HighDatabaseLatency
