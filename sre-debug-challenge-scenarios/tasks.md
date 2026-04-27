@@ -161,22 +161,22 @@ The order below is chosen so that the `scenarios/` tooling and PBT harness come 
     - Purely additive — do not touch any existing flag (Property 11 relies on this).
     - _Design: § Components / 2 (flag definitions)_
     - _Requirements: Req 12.1, Req 8.5_
-  - [x] 6.6 Add `AnomalousZeroValueOrders` rule to `src/prometheus/alert-rules.yml` (atomic edit) (TESTED ✅)
-    - Append a single new alert block inside the existing `observability_agent_alerts` group, exactly as defined in design § Components / 7 / "Rule: AnomalousZeroValueOrders", including the R2-mitigation minimum-sample clause `AND sum(rate(app_order_shipping_cost_usd_total{service_name="checkout"}[5m])) > 0.05`.
+  - [x] 6.6 Add `DataAnomalyWarning` rule to `src/prometheus/alert-rules.yml` (atomic edit) (TESTED ✅)
+    - Append a single new alert block inside the existing `observability_agent_alerts` group, exactly as defined in design § Components / 7 / "Rule: DataAnomalyWarning", including the R2-mitigation minimum-sample clause `AND sum(rate(app_order_shipping_cost_usd_total{service_name="checkout"}[5m])) > 0.05`.
     - Required `annotations.summary` must NOT contain any of: `quote`, `PHP`, `numberOfItems`, `calculate-quote`, `shipping service`, `Rust` (Deceptive_Alert contract).
     - Required `annotations.description` must suggest at least one Red_Herring_Path (payment, checkout arithmetic, or currency).
     - Labels: `severity: warning`, `scenario: case1`. `for: 2m`. No `runbook_url` annotation (Req 1.8 amended).
     - Run `promtool check rules src/prometheus/alert-rules.yml`; commit only on green.
     - Leave `PaymentServiceUnreachable` (from task 5.1) and all other rules byte-for-byte unchanged.
-    - _Design: § Components / 7 (AnomalousZeroValueOrders rule), § Risks & Mitigations R2_
+    - _Design: § Components / 7 (DataAnomalyWarning rule), § Risks & Mitigations R2_
     - _Requirements: Req 1.2, Req 1.3, Req 4.1, Req 4.2, Req 4.3, Req 4.4, Req 4.5, Req 4.6, Req 12.2_
   - [x] 6.7 Implement Case 1 activate / teardown branches in `scenarios/controller.py` (TESTED ✅)
-    - `activate case1`: set `flags.quoteSilentCorruption.defaultVariant = "on"`; ensure `AnomalousZeroValueOrders` rule is present; reload Prometheus.
+    - `activate case1`: set `flags.quoteSilentCorruption.defaultVariant = "on"`; ensure `DataAnomalyWarning` rule is present; reload Prometheus.
     - `teardown case1`: flip flag to `off`. No container restart.
-    - `verify case1`: poll `ALERTS{alertname="AnomalousZeroValueOrders", alertstate="firing"}` with 5-minute timeout and 60-second grace before first poll.
+    - `verify case1`: poll `ALERTS{alertname="DataAnomalyWarning", alertstate="firing"}` with 5-minute timeout and 60-second grace before first poll.
     - _Design: § Components / 1 (Case 1 activation sequence), § Teardown Procedures (Case 1 row)_
     - _Requirements: Req 2.2, Req 3.1, Req 4.5, Req 4.6, Req 5.5_
-  - [ ] 6.8 ~~Create `scenarios/runbooks/case1-anomalous-zero.md`~~ — REMOVED per Req 1.8 amendment. The deceptive `annotations.description` on `AnomalousZeroValueOrders` (set in task 6.6) is the entry-point document. It already contains the red-herring hints toward payment / checkout-arithmetic / currency per Req 1.3, 4.4.
+  - [ ] 6.8 ~~Create `scenarios/runbooks/case1-anomalous-zero.md`~~ — REMOVED per Req 1.8 amendment. The deceptive `annotations.description` on `DataAnomalyWarning` (set in task 6.6) is the entry-point document. It already contains the red-herring hints toward payment / checkout-arithmetic / currency per Req 1.3, 4.4.
   - [ ] 6.9 Implement Case 1 properties in `scenarios/tests/test_properties.py`
     - [ ]* 6.9.1 Write property test `test_property_2_case1_checkout_error_rate_baseline`
       - **Property 2: Case 1 checkout error rate stays at baseline**
@@ -213,22 +213,22 @@ The order below is chosen so that the `scenarios/` tooling and PBT harness come 
     - Purely additive.
     - _Design: § Components / 2 (flag definitions)_
     - _Requirements: Req 12.1_
-  - [x] 7.3 Add `ProductReviewsMemoryHigh` rule to `src/prometheus/alert-rules.yml` (atomic edit) (TESTED ✅)
-    - Append a single new alert block inside `observability_agent_alerts`, exactly as defined in design § Components / 7 / "Rule: ProductReviewsMemoryHigh".
+  - [x] 7.3 Add `ResourceUtilizationWarning` rule to `src/prometheus/alert-rules.yml` (atomic edit) (TESTED ✅)
+    - Append a single new alert block inside `observability_agent_alerts`, exactly as defined in design § Components / 7 / "Rule: ResourceUtilizationWarning".
     - Expression uses `OR` between the docker_stats ratio path and the static 400 MB fallback — both must be present so the alert fires under either deployment configuration.
     - Required `annotations.summary` literal substring: `limited forensic data available`.
     - Required `annotations.description` enumerates exactly four investigation steps (memory trend, span-metrics errors, OpenSearch logs, `cpython_gc_*`), each with a WILL / WILL NOT verdict.
     - Labels: `severity: warning`, `scenario: case3`. `for: 5m`. No `runbook_url` annotation (Req 1.8 amended).
     - Run `promtool check rules src/prometheus/alert-rules.yml`; commit only on green.
-    - _Design: § Components / 7 (ProductReviewsMemoryHigh rule)_
+    - _Design: § Components / 7 (ResourceUtilizationWarning rule)_
     - _Requirements: Req 1.6, Req 1.7, Req 7.7, Req 7.8, Req 12.2_
   - [x] 7.4 Implement Case 3 activate / teardown branches in `scenarios/controller.py` (TESTED ✅)
-    - `activate case3`: set `flags.productReviewsMemoryLeak.defaultVariant = "on"`; ensure `ProductReviewsMemoryHigh` rule present; reload Prometheus.
+    - `activate case3`: set `flags.productReviewsMemoryLeak.defaultVariant = "on"`; ensure `ResourceUtilizationWarning` rule present; reload Prometheus.
     - `teardown case3`: flip flag to `off` **and** run `subprocess.run(["docker", "compose", "-f", "docker-compose.minimal.yml", "restart", "product-reviews"], check=True)` to release the leaked module-global list (the only destructive operation in the design).
-    - `verify case3`: poll `ALERTS{alertname="ProductReviewsMemoryHigh", alertstate="firing"}` with 15-minute timeout and 60-second grace.
+    - `verify case3`: poll `ALERTS{alertname="ResourceUtilizationWarning", alertstate="firing"}` with 15-minute timeout and 60-second grace.
     - _Design: § Components / 1 (Case 3 activation), § Teardown Procedures (Case 3 row), § Error Handling / Product-reviews container restart_
     - _Requirements: Req 2.4, Req 7.9, Req 7.12_
-  - [ ] 7.5 ~~Create `scenarios/runbooks/case3-product-reviews-memory.md`~~ — REMOVED per Req 1.8 amendment. The terminal `annotations.description` on `ProductReviewsMemoryHigh` (set in task 7.3) already enumerates the four investigation steps with WILL / WILL NOT verdicts; it IS the entry-point document. The escalation sentence "request a heap profile" is incorporated into the alert description in task 7.3 rather than living in a separate file.
+  - [ ] 7.5 ~~Create `scenarios/runbooks/case3-product-reviews-memory.md`~~ — REMOVED per Req 1.8 amendment. The terminal `annotations.description` on `ResourceUtilizationWarning` (set in task 7.3) already enumerates the four investigation steps with WILL / WILL NOT verdicts; it IS the entry-point document. The escalation sentence "request a heap profile" is incorporated into the alert description in task 7.3 rather than living in a separate file.
   - [ ] 7.6 Implement Case 3 properties in `scenarios/tests/test_properties.py`
     - [ ]* 7.6.1 Write property test `test_property_7_case3_product_reviews_silent_in_opensearch`
       - **Property 7: Case 3 — product-reviews remains silent in OpenSearch**
@@ -246,7 +246,7 @@ The order below is chosen so that the `scenarios/` tooling and PBT harness come 
   - [ ]* 8.1 Write property test `test_property_1_clean_baseline`
     - **Property 1: Clean baseline**
     - **Validates: Req 10.8, Req 12.3**
-    - Asserts `ALERTS{alertname=~"AnomalousZeroValueOrders|PaymentServiceUnreachable|ProductReviewsMemoryHigh", alertstate="firing"}` returns zero series during Baseline.
+    - Asserts `ALERTS{alertname=~"DataAnomalyWarning|PaymentServiceUnreachable|ResourceUtilizationWarning", alertstate="firing"}` returns zero series during Baseline.
     - Requires one-time setup: `flags.paymentUnreachable.defaultVariant` must be `off` at Baseline (per Req 12.3). The test asserts this as a precondition.
     - `INTEGRATION=1` gated; `@settings(max_examples=20)`.
   - [ ]* 8.2 Write property test `test_property_9_controller_idempotent`
@@ -271,12 +271,12 @@ The order below is chosen so that the `scenarios/` tooling and PBT harness come 
 - [ ] 9. Example-based tests for alert text and rules-file validity
   - [ ]* 9.1 Write `scenarios/tests/test_alert_text.py`
     - Parse `src/prometheus/alert-rules.yml`; assert:
-      - `AnomalousZeroValueOrders` `summary` contains none of `{"quote","PHP","numberOfItems","calculate-quote","shipping service","Rust"}` (Req 1.2, Req 4.3).
-      - `AnomalousZeroValueOrders` `description` contains at least one of `{"payment","arithmetic","currency"}` (Req 1.3, Req 4.4).
+      - `DataAnomalyWarning` `summary` contains none of `{"quote","PHP","numberOfItems","calculate-quote","shipping service","Rust"}` (Req 1.2, Req 4.3).
+      - `DataAnomalyWarning` `description` contains at least one of `{"payment","arithmetic","currency"}` (Req 1.3, Req 4.4).
       - `PaymentServiceUnreachable` `summary` contains all of `{"oteldemo.PaymentService/Charge","checkout","UNAVAILABLE"}` (Req 1.4).
       - `PaymentServiceUnreachable` `description` contains `"service=checkout error=true"` and `"resource.service.name.keyword:checkout AND severity.text:ERROR"` (Req 1.5).
-      - `ProductReviewsMemoryHigh` `summary` contains `"limited forensic data available"` (Req 1.6).
-      - `ProductReviewsMemoryHigh` `description` enumerates four numbered investigative steps each containing either `WILL ` or `WILL NOT ` (Req 1.7).
+      - `ResourceUtilizationWarning` `summary` contains `"limited forensic data available"` (Req 1.6).
+      - `ResourceUtilizationWarning` `description` enumerates four numbered investigative steps each containing either `WILL ` or `WILL NOT ` (Req 1.7).
       - No alert carries an `annotations.runbook_url` field (Req 1.8 amended — the `description` field is the self-contained entry-point document).
   - [ ]* 9.2 Write `scenarios/tests/test_rules_file.py`
     - Shell out to `promtool check rules src/prometheus/alert-rules.yml`; assert exit 0.
@@ -287,9 +287,9 @@ The order below is chosen so that the `scenarios/` tooling and PBT harness come 
   - [ ]* 9.4 Write `scenarios/tests/test_tm_a_compliance.py` — TM-A trainee-surface compliance
     - Parse `src/prometheus/alert-rules.yml`; for every alert, assert that `annotations.summary` and `annotations.description` contain none of the path-shaped substrings: `src/`, `docker-compose`, `grep `, `cat `, `docker exec`, `docker compose`, `kubectl`, `/etc/`, `/tmp/`, `demo.flagd.json`, `composer.json`, `main.go`, `routes.php`, `product_reviews_server.py`, or any path containing `src/`. Alerts may reference metric names, query fragments, and service names only — never source paths or shell commands.
     - Additionally enforce per-case forbidden strings in `annotations.description` (the entry-point document the trainee sees):
-      - Case 1 (`AnomalousZeroValueOrders`): none of `quote`, `PHP`, `numberOfItems`, `calculate-quote`, `quoteSilentCorruption`, `span event`, `exception event`.
+      - Case 1 (`DataAnomalyWarning`): none of `quote`, `PHP`, `numberOfItems`, `calculate-quote`, `quoteSilentCorruption`, `span event`, `exception event`.
       - Case 2 (`PaymentServiceUnreachable`): none of `paymentUnreachable`, `flagd`, `feature flag`, `badAddress` (the string `badAddress:50051` is allowed as evidence guidance; the bare word `badAddress` referring to the *mechanism* is not).
-      - Case 3 (`ProductReviewsMemoryHigh`): none of `productReviewsMemoryLeak`, `_LEAK_SINK`, `bg-housekeeper`, `threading.Thread`, `time.sleep`.
+      - Case 3 (`ResourceUtilizationWarning`): none of `productReviewsMemoryLeak`, `_LEAK_SINK`, `bg-housekeeper`, `threading.Thread`, `time.sleep`.
     - Rationale: under TM-A the SRE_Trainee has only Prometheus / Alertmanager / Grafana / Jaeger / OpenSearch UIs. Any alert annotation that points them at a file, a shell command, or the root-cause mechanism is a TM-A violation and must fail this test.
     - _Design: § Threat model for the SRE_Trainee (normative), § Components / 9 (runbook pages — REMOVED)_
     - _Requirements: Req 1.2, Req 1.8 (amended), Req 8.1, Req 8.2 (amended), Req 8.4_

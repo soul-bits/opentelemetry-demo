@@ -41,9 +41,9 @@ class ActivationRollbackError(RuntimeError):
 
 # Alert rule names per scenario
 ALERT_NAMES = {
-    "case1": "AnomalousZeroValueOrders",
+    "case1": "DataAnomalyWarning",
     "case2": "PaymentServiceUnreachable",
-    "case3": "ProductReviewsMemoryHigh",
+    "case3": "ResourceUtilizationWarning",
 }
 
 # Expected time-to-fire (in seconds) per scenario

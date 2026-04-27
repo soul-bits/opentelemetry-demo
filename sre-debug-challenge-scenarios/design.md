@@ -8,9 +8,9 @@ The design deliberately treats **the alert text itself as the primary difficulty
 
 | Case | Difficulty | Alert | Root Cause | Injection Surface |
 |---|---|---|---|---|
-| Case 1 | HARD / Deceptive | `AnomalousZeroValueOrders` | PHP `quote` silently returns `0` for 20–40% of `/getquote` calls, corrupting shipping cost downstream | OpenFeature gate at entry of `calculateQuote()` in `src/quote/app/routes.php` |
+| Case 1 | HARD / Deceptive | `DataAnomalyWarning` | PHP `quote` silently returns `0` for 20–40% of `/getquote` calls, corrupting shipping cost downstream | OpenFeature gate at entry of `calculateQuote()` in `src/quote/app/routes.php` |
 | Case 2 | EASY / Prescriptive | `PaymentServiceUnreachable` (replaces the typo-ridden `SomethingWrongHere`) | Checkout dials `badAddress:50051` for `oteldemo.PaymentService/Charge` | Existing `paymentUnreachable` branch in `src/checkout/main.go` |
-| Case 3 | IMPOSSIBLE / Terminal | `ProductReviewsMemoryHigh` | Python `product-reviews` appends every request payload to a module-global list | OpenFeature gate at entry of the two gRPC handlers in `src/product-reviews/product_reviews_server.py` |
+| Case 3 | IMPOSSIBLE / Terminal | `ResourceUtilizationWarning` | Python `product-reviews` appends every request payload to a module-global list | OpenFeature gate at entry of the two gRPC handlers in `src/product-reviews/product_reviews_server.py` |
 
 The normative telemetry contract for every active service (metric families, label dimensions, log indexes, trace operation names, documented gaps) lives in `service_map.yml` at the repository root and is referenced — not duplicated — throughout this document. The `service-map-observability-validator` (Req 9) reads it directly.
 
@@ -30,9 +30,9 @@ Requirement 8.5 (trainee observes `quoteSilentCorruption=on` in the flagd file) 
 
 | Alert | First-read reaction the design induces |
 |---|---|
-| `AnomalousZeroValueOrders` | "Suspect payment or checkout arithmetic." (Deceptive — wastes ≥30 min before pivoting upstream.) |
+| `DataAnomalyWarning` | "Suspect payment or checkout arithmetic." (Deceptive — wastes ≥30 min before pivoting upstream.) |
 | `PaymentServiceUnreachable` | "Payment service unreachable, open Jaeger for `service=checkout error=true`." (Prescriptive — RCA in <15 min.) |
-| `ProductReviewsMemoryHigh` | "Memory leak on `product-reviews`, origin unclear; logs index returns nothing." (Terminal — unsolvable from telemetry alone.) |
+| `ResourceUtilizationWarning` | "Memory leak on `product-reviews`, origin unclear; logs index returns nothing." (Terminal — unsolvable from telemetry alone.) |
 
 ---
 
@@ -156,13 +156,13 @@ stateDiagram-v2
 1. Acquire POSIX advisory lock on `./.scenario-state.json`. If another scenario is active with a different identifier → refuse, exit 2.
 2. Read `src/flagd/demo.flagd.json` into memory; snapshot to `./.scenario-backup.json`.
 3. Set `flags.quoteSilentCorruption.defaultVariant` to `"on"`; write atomically (`tempfile + os.replace`). Flagd hot-reloads within ~1 s.
-4. Read `src/prometheus/alert-rules.yml`; ensure `AnomalousZeroValueOrders` rule is present (merge, not replace). Write atomically.
+4. Read `src/prometheus/alert-rules.yml`; ensure `DataAnomalyWarning` rule is present (merge, not replace). Write atomically.
 5. `POST http://localhost:9090/-/reload`. Expect `200`. On non-200, restore backup and exit non-zero (Req 2.7).
 6. Poll Prometheus `/api/v1/rules` for the rule to appear (≤5 s).
 7. Update state file: `active_scenario=case1, activated_at=<now>`.
 8. Print to stdout (Req 2.6) — visible to the Training_Coordinator only, not to the SRE_Trainee:
    - Scenario ID: `case1`
-   - Expected alert: `AnomalousZeroValueOrders`
+   - Expected alert: `DataAnomalyWarning`
    - Expected time-to-fire: `≤ 300 s`
    - Training_Coordinator inspection URL: `http://localhost:4000/?flag=quoteSilentCorruption` (flagd-ui is NOT running under the minimal compose; this URL only resolves if the coordinator has uncommented the `flagd-ui` container. Under the default minimal compose the coordinator inspects the flag by reading `src/flagd/demo.flagd.json` directly from the repo checkout. Neither path is exposed to the SRE_Trainee under TM-A.)
 
@@ -315,10 +315,10 @@ No code edit is required for Case 2 — only the flag flip and the alert-rule re
 
 All three rules live in the existing `observability_agent_alerts` group, at 30 s evaluation interval.
 
-#### Rule: `AnomalousZeroValueOrders` (Case 1 — Deceptive, Req 4)
+#### Rule: `DataAnomalyWarning` (Case 1 — Deceptive, Req 4)
 
 ```yaml
-- alert: AnomalousZeroValueOrders
+- alert: DataAnomalyWarning
   expr: |
     (
       sum(rate(app_order_shipping_cost_usd_total{service_name="checkout", bucket="zero"}[5m]))
@@ -380,14 +380,14 @@ Replaces the existing `SomethingWrongHere` block in place. All other alert block
 
 Req 1.4 literal substrings are all present in `summary`: `oteldemo.PaymentService/Charge`, `checkout`, `UNAVAILABLE`. Req 1.5 Jaeger and OpenSearch queries are in `description`.
 
-#### Rule: `ProductReviewsMemoryHigh` (Case 3 — Terminal, Req 7.7, 7.8)
+#### Rule: `ResourceUtilizationWarning` (Case 3 — Terminal, Req 7.7, 7.8)
 
 **Primary expression (preferred)**: ratio against docker_stats-derived container limit. `service_map.yml` does not currently catalogue a `container_memory_usage_limit_bytes` metric, and the otel-collector's `docker_stats` receiver emits `container.memory.usage.limit` — surfaced to Prometheus as `container_memory_usage_limit_bytes` with label `container_name`. **We verify at validator runtime** whether that series is present; if not, we fall back to the static threshold.
 
 **Fallback expression (per Req 7.7 alternative path)**: static 400 MB threshold, which is 80% of the 500 MB container limit in `docker-compose.minimal.yml` for `product-reviews`.
 
 ```yaml
-- alert: ProductReviewsMemoryHigh
+- alert: ResourceUtilizationWarning
   expr: |
     (
       process_memory_usage_bytes{service_name="product-reviews"}
@@ -523,7 +523,7 @@ PBT framework: **Hypothesis (Python)**, because (a) the scenario-controller, val
 
 ### Property 1: Clean baseline
 
-*For any* randomized 5-minute Baseline window (no scenario active, `paymentUnreachable=off`), the Prometheus query `ALERTS{alertname=~"AnomalousZeroValueOrders|PaymentServiceUnreachable|ProductReviewsMemoryHigh", alertstate="firing"}` SHALL return zero series.
+*For any* randomized 5-minute Baseline window (no scenario active, `paymentUnreachable=off`), the Prometheus query `ALERTS{alertname=~"DataAnomalyWarning|PaymentServiceUnreachable|ResourceUtilizationWarning", alertstate="firing"}` SHALL return zero series.
 
 **Validates: Requirements 10.8, 12.3**
 
@@ -689,7 +689,7 @@ Case 1 / Case 2 / Case 3 properties require a running stack; in CI they are gate
 
 ### Case 1 RCA path (canonical, Req 5.1)
 
-1. **Observe alert.** Grafana → Alerts panel, or Prometheus `/alerts`. `AnomalousZeroValueOrders` firing with `scenario=case1, severity=warning`.
+1. **Observe alert.** Grafana → Alerts panel, or Prometheus `/alerts`. `DataAnomalyWarning` firing with `scenario=case1, severity=warning`.
 2. **Find affected traces.** In Grafana → Explore → Tempo/Jaeger datasource. Search: `service=checkout operation="oteldemo.CheckoutService/PlaceOrder"` last 5 min, filter by attribute `app.shipping.amount < 1.0`. Expect ~30% match rate.
 3. **Open a matching trace.** Jaeger root span `oteldemo.CheckoutService/PlaceOrder` carries `app.shipping.amount=0, app.order.amount=0` → confirms checkout did the arithmetic correctly on the inputs it received. Root cause is upstream.
 4. **Follow the shipping-quote subtree.** Descend to `checkout → POST /get-quote` (client span) → `shipping POST /get-quote` (server span). Shipping's `info` log for this trace says `SendingQuoteValue dollars=0 cents=0`. Again, shipping faithfully forwarded `0` — so root cause is further upstream.
@@ -754,7 +754,7 @@ Teardown is idempotent (Req 11.6) and does not rotate logs, delete indexes, or r
 |---|---|
 | `scenarios/` (new directory) | New CLI + validator + tests (no runbooks/ subdirectory — Req 1.8 amended; alert description is the entry-point document) |
 | `src/flagd/demo.flagd.json` | Add two flags: `quoteSilentCorruption`, `productReviewsMemoryLeak` (additive) |
-| `src/prometheus/alert-rules.yml` | Add `AnomalousZeroValueOrders`; add `ProductReviewsMemoryHigh`; **replace** the `SomethingWrongHere` block with `PaymentServiceUnreachable` |
+| `src/prometheus/alert-rules.yml` | Add `DataAnomalyWarning`; add `ResourceUtilizationWarning`; **replace** the `SomethingWrongHere` block with `PaymentServiceUnreachable` |
 | `src/quote/app/routes.php` | Add ~8-line flag gate at the top of `calculateQuote()` before existing `try` block |
 | `src/quote/composer.json` | Add `open-feature/sdk` and `open-feature/flagd-provider` dependencies |
 | `src/quote/app/dependencies.php` | Register OpenFeature flagd provider once at app boot |

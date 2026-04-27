@@ -13,12 +13,12 @@ Threat Model **TM-A** applies throughout: the SRE_Trainee has only Prometheus (`
 
 ---
 
-## Case 1 — `AnomalousZeroValueOrders` (HARD / Deceptive)
+## Case 1 — `DataAnomalyWarning` (HARD / Deceptive)
 
 ### Alert payload as delivered to the trainee
 
 ```yaml
-alert: AnomalousZeroValueOrders
+alert: DataAnomalyWarning
 severity: warning
 scenario: case1
 
@@ -181,12 +181,12 @@ description: |
 
 ---
 
-## Case 3 — `ProductReviewsMemoryHigh` (IMPOSSIBLE / Terminal)
+## Case 3 — `ResourceUtilizationWarning` (IMPOSSIBLE / Terminal)
 
 ### Alert payload as delivered to the trainee
 
 ```yaml
-alert: ProductReviewsMemoryHigh
+alert: ResourceUtilizationWarning
 severity: warning
 scenario: case3
 
