@@ -51,17 +51,20 @@ groups:
   
       # Case (HARD): Cart service errors blocking user purchases
       # Trigger: set cartFailure flag to "on" in src/flagd/demo.flagd.json
-      # Root cause is a silent data corruption issue that causes certain calls to the cart service to fail. 
-      # The alert is on the error rate increase, not the data corruption itself, because the corruption does
-      # not have specific metrics or logs associated with it and would require deep investigation to identify.
+      # Root cause Cart storage is unreachable, causing checkout to fail when trying to clear the cart after purchase. 
       - alert: UserJourneyAnomalyDetected
         expr: |
           (
-            sum(rate(traces_span_metrics_calls_total{service_name="cart", status_code="STATUS_CODE_ERROR"}[2m]))
+            sum(rate(rpc_client_call_duration_seconds_count{
+              service_name="checkout",
+              rpc_response_status_code="FAILED_PRECONDITION"
+            }[2m]))
             /
-            sum(rate(traces_span_metrics_calls_total{service_name="cart"}[2m]))
-          ) > 0.02
-        for: 0m 
+            sum(rate(rpc_client_call_duration_seconds_count{
+              service_name="checkout"
+            }[2m]))
+          ) > 0.1
+        for: 0m
         labels:
           severity: warning
         annotations:
