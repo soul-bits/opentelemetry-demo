@@ -5,25 +5,8 @@ groups:
   - name: observability_agent_alerts
     interval: 30s
     rules:
-      # Payment service unreachable - checkout cannot charge customers
-      # Trigger: set paymentUnreachable flag to "on" in src/flagd/demo.flagd.json
-      - alert: SomethingWrongHere # PaymentServiceUnreachable
-        expr: |
-          (
-            sum(rate(rpc_client_call_duration_seconds_count{service_name="checkout", rpc_response_status_code!="OK"}[5m])) by (service_name, rpc_method)
-            /
-            sum(rate(rpc_client_call_duration_seconds_count{service_name="checkout"}[5m])) by (service_name, rpc_method)
-          ) > 0.5
-        for: 1m
-        labels:
-          severity: critical
-        annotations:
-          summary: "Somethig is wrong"
-          description: "Don't know where wrong."
-          # summary: "Checkout downstream call failing: {{ $labels.rpc_method }}"
-          # description: "{{ $value | humanizePercentage }} of {{ $labels.rpc_method }} calls from checkout are failing"
 
-      # Case 2 (EASY): Payment service unreachable - checkout cannot charge customers
+      # Case (EASY): Payment service unreachable - checkout cannot charge customers
       # Trigger: set paymentUnreachable flag to "on" in src/flagd/demo.flagd.json
       - alert: OperationalAnomalyDetected
         expr: |
@@ -35,50 +18,73 @@ groups:
         for: 1m
         labels:
           severity: critical
-          scenario: case2
+          scenario: case_easy
         annotations:
           summary: "Alert"
           description: |
             Review system logs, traces, and metrics.
 
-      # Case 1 (HARD): Anomalous zero-value shipping costs on placed orders
-      # Trigger: set quoteSilentCorruption flag to "on" in src/flagd/demo.flagd.json
-      - alert: DataAnomalyWarning
+      # Case 4 (MEDIUM): Latency degradation on a key recommendation service method
+      # Trigger: set recommendationLatencyDegradation flag to "on" in src/flagd/demo.flagd.json     
+      # Root cause is a cache policy change that causes more calls to the database, which is slower than the cache. 
+      # The alert is on the service latency degradation, not the database itself, because the database latency is still within acceptable thresholds and would not trigger a database-specific alert.
+      # The root cause is one hop deeper (cache policy) not the service itself                                                                         
+                                                                                                                                                                              
+      - alert: ServiceLatencyDegradation
         expr: |
           (
-            sum(rate(app_order_shipping_cost_usd_total{service_name="checkout", bucket="zero"}[5m]))
+            sum(rate(rpc_server_call_duration_seconds_count{
+              service_name="product-catalog",
+              rpc_response_status_code!="OK"
+            }[2m]))
             /
-            sum(rate(app_order_shipping_cost_usd_total{service_name="checkout"}[5m]))
-          ) > 0.1
-          AND sum(rate(app_order_shipping_cost_usd_total{service_name="checkout"}[5m])) > 0.05
-        for: 2m
-        labels:
-          severity: warning
-          scenario: case1
-        annotations:
-          summary: "Data anomaly detected"
-          description: |
-            An anomaly in system data has been detected. Use traces, logs, and metrics to investigate the source and impact.
+            sum(rate(rpc_server_call_duration_seconds_count{
+              service_name="product-catalog"
+            }[2m]))
+          ) > 0.01
+        for: 0m                                                                                                                                                                                                                             
+        labels:                                   
+          severity: warning                                                                                                                                                                                            
+          scenario: case_medium                                     
 
-      # Case 3 (IMPOSSIBLE): Product Reviews container memory high
-      # Trigger: set productReviewsMemoryLeak flag to "on" in src/flagd/demo.flagd.json
-      - alert: ResourceUtilizationWarning
-        expr: |
-          (
-            container_memory_usage_bytes{container_name="product-reviews"}
-            /
-            (container_spec_memory_limit_bytes{container_name="product-reviews"} > 0)
-          ) > 0.85
-          OR
-          process_memory_usage_bytes{service_name="product-reviews"} > 400000000
-        for: 5m
-        labels:
-          severity: warning
-          scenario: case3
-        annotations:
-          summary: "Resource utilization threshold exceeded"
-          description: |
-            A resource utilization threshold has been exceeded. Investigate affected services and resource allocation using available observability data.
+      # # Case 1 (HARD): Anomalous zero-value shipping costs on placed orders
+      # # Trigger: set quoteSilentCorruption flag to "on" in src/flagd/demo.flagd.json
+      # - alert: DataAnomalyWarning
+      #   expr: |
+      #     (
+      #       sum(rate(app_order_shipping_cost_usd_total{service_name="checkout", bucket="zero"}[5m]))
+      #       /
+      #       sum(rate(app_order_shipping_cost_usd_total{service_name="checkout"}[5m]))
+      #     ) > 0.1
+      #     AND sum(rate(app_order_shipping_cost_usd_total{service_name="checkout"}[5m])) > 0.05
+      #   for: 2m
+      #   labels:
+      #     severity: warning
+      #     scenario: case1
+      #   annotations:
+      #     summary: "Data anomaly detected"
+      #     description: |
+      #       An anomaly in system data has been detected. Use traces, logs, and metrics to investigate the source and impact.
+
+      # # Case 3 (IMPOSSIBLE): Product Reviews container memory high
+      # # Trigger: set productReviewsMemoryLeak flag to "on" in src/flagd/demo.flagd.json
+      # - alert: ResourceUtilizationWarning
+      #   expr: |
+      #     (
+      #       container_memory_usage_bytes{container_name="product-reviews"}
+      #       /
+      #       (container_spec_memory_limit_bytes{container_name="product-reviews"} > 0)
+      #     ) > 0.85
+      #     OR
+      #     process_memory_usage_bytes{service_name="product-reviews"} > 400000000
+      #   for: 5m
+      #   labels:
+      #     severity: warning
+      #     scenario: case3
+      #   annotations:
+      #     summary: "Resource utilization threshold exceeded"
+      #     description: |
+      #       A resource utilization threshold has been exceeded. Investigate affected services and resource allocation using available observability data.
 
       # High database operation latency on product-catalog
       # Indicates slow PostgreSQL queries — visible in Jaeger traces and DB metrics
