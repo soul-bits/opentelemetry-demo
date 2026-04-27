@@ -8,6 +8,7 @@ groups:
 
       # Case (EASY): Payment service unreachable - checkout cannot charge customers
       # Trigger: set paymentUnreachable flag to "on" in src/flagd/demo.flagd.json
+      # Root cause : a network connectivity issue between the checkout service and the payment service, causing all payment attempts to fail.
       - alert: OperationalAnomalyDetected
         expr: |
           (
@@ -26,10 +27,8 @@ groups:
 
       # Case 4 (MEDIUM): Latency degradation on a key recommendation service method
       # Trigger: set recommendationLatencyDegradation flag to "on" in src/flagd/demo.flagd.json
-      # Root cause is a cache policy change that causes more calls to the database, which is slower than the cache. 
-      # The alert is on the service latency degradation, not the database itself, because the database latency is still
-      # within acceptable thresholds and would not trigger a database-specific alert.
-      # The root cause is one hop deeper (cache policy) not the service itself
+      # Root cause : A specific product lookup in the product catalog is failing,
+      # caused by the productCatalogFailure flag injecting errors for one product ID.  
               
       - alert: ServiceLatencyDegradation
         expr: |
@@ -51,7 +50,7 @@ groups:
   
       # Case (HARD): Cart service errors blocking user purchases
       # Trigger: set cartFailure flag to "on" in src/flagd/demo.flagd.json
-      # Root cause Cart storage is unreachable, causing checkout to fail when trying to clear the cart after purchase. 
+      # Root cause: Cart storage is unreachable, causing checkout to fail when trying to clear the cart after purchase. 
       - alert: UserJourneyAnomalyDetected
         expr: |
           (
@@ -75,9 +74,8 @@ groups:
                        
       # Case (VERY HARD): DB query latency spike caused by upstream cache exhaustion 
       # Trigger: set recommendationCacheFailure flag to "on" in src/flagd/demo.flagd.json
-      # Root cause is a cache exhaustion issue in the recommendation service that causes increased load and latency on the database.
-      # The alert is on the database latency spike, not the cache exhaustion itself, because the cache does not have specific metrics 
-      # or logs associated with the exhaustion and would require deep investigation to identify.
+      # Root cause : Recommendation service cache is disabled, causing it to hammer
+      # the product catalog database with queries, which overwhelms the already-slow astronomy DB.
       - alert: InfrastructureResourceAnomaly            
         expr: |            
           histogram_quantile(0.95,                      
