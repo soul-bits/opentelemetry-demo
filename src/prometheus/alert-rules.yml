@@ -25,10 +25,8 @@ groups:
           description: |
             Review system logs, traces, and metrics.
 
-      # Case (MEDIUM): Latency degradation on a key recommendation service method
-      # Trigger: set recommendationLatencyDegradation flag to "on" in src/flagd/demo.flagd.json
-      # Root cause : A specific product lookup in the product catalog is failing,
-      # caused by the productCatalogFailure flag injecting errors for one product ID.  
+      # Case (MEDIUM): Product catalog returning errors for a specific product
+      # Trigger: set productCatalogFailure flag to "on" in src/flagd/demo.flagd.json  
               
       - alert: ServiceLatencyDegradation
         expr: |
