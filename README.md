@@ -1,5 +1,140 @@
 <!-- markdownlint-disable-next-line -->
-# <img src="https://opentelemetry.io/img/logos/opentelemetry-logo-nav.png" alt="OTel logo" width="45"> OpenTelemetry Demo
+# <img src="https://opentelemetry.io/img/logos/opentelemetry-logo-nav.png" alt="OTel logo" width="45"> OpenTelemetry Demo — RCA Testing Stack
+
+> **This is a trimmed fork** of the [OpenTelemetry Demo](https://github.com/open-telemetry/opentelemetry-demo) used as a live environment for **SRE Root Cause Analysis (RCA) testing**. Three fault-injection scenarios fire Prometheus alerts of varying difficulty; trainees debug them using only Metrics, Logs, and Traces.
+
+---
+
+## Stack Overview
+
+An astronomy-themed e-commerce shop built from ~15 microservices in 8 languages. All services export telemetry via OTLP to a central OpenTelemetry Collector, which fans out to three backends:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        LOAD GENERATOR (Locust)                  │
+│                              :8089                              │
+└──────────────────────────────┬──────────────────────────────────┘
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                     FRONTEND-PROXY (Envoy) :80                  │
+└──────────────────────────────┬──────────────────────────────────┘
+                               ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                       FRONTEND (Next.js) :8080                  │
+└───┬────────┬────────┬────────┬────────┬────────┬────────┬───────┘
+    ▼        ▼        ▼        ▼        ▼        ▼        ▼
+  cart    checkout  currency shipping recommend  product   product
+  (.NET)   (Go)     (C++)   (Rust)   (Python)  -catalog  -reviews
+  :7070    :5050    :7001   :50050   :9001     (Go)      (Python)
+    │        │                 │        │      :3550      :3551
+    ▼        │                 ▼        ▼        │          │
+ valkey      │               quote    flagd   astronomy   astronomy
+ (Redis)     │               (PHP)    :8013     -db         -db
+ :6379       │               :8090              (Postgres)  (Postgres)
+             │                                  :5432       :5432
+             ▼
+          payment
+          (Node.js)
+          :50051
+```
+
+### Telemetry Pipeline
+
+```
+All Services ──OTLP──► OTel Collector (:4317 gRPC, :4318 HTTP)
+                              │
+                ┌─────────────┼─────────────┐
+                ▼             ▼             ▼
+            Jaeger       Prometheus     OpenSearch
+           (traces)      (metrics)       (logs)
+           :16686         :9090          :9200
+                ▲             ▲             ▲
+                └─────────────┼─────────────┘
+                              │
+                           Grafana :3000
+```
+
+### Key Ports
+
+| Port | Service | What you use it for |
+|------|---------|---------------------|
+| 80 | frontend-proxy | Browse the shop |
+| 3000 | Grafana | Dashboards, explore metrics/logs/traces |
+| 8089 | Locust | Load generator control |
+| 9090 | Prometheus | PromQL queries, alert status |
+| 9093 | Alertmanager | Alert routing and silencing |
+| 16686 | Jaeger | Distributed trace search |
+| 9200 | OpenSearch | Log search (via Grafana datasource) |
+
+### Active Services (docker-compose.minimal.yml)
+
+| Service | Language | Protocol | Role |
+|---------|----------|----------|------|
+| frontend | TypeScript | HTTP | Web UI, SSR |
+| frontend-proxy | Envoy | HTTP | Reverse proxy |
+| checkout | Go | gRPC | Order orchestration |
+| payment | Node.js | gRPC | Credit card charges |
+| cart | .NET | gRPC | Shopping cart (backed by Valkey) |
+| product-catalog | Go | gRPC | Product listing (backed by PostgreSQL) |
+| product-reviews | Python | gRPC | Product reviews |
+| currency | C++ | gRPC | Currency conversion |
+| shipping | Rust | HTTP | Shipping quotes (calls quote service) |
+| quote | PHP | HTTP | Shipping cost calculation |
+| recommendation | Python | gRPC | Product recommendations |
+| flagd | Go | gRPC | Feature flags (OpenFeature) |
+| load-generator | Python | HTTP | Synthetic traffic (Locust) |
+
+### Disabled Services (commented out in minimal compose)
+
+`ad`, `email`, `image-provider`, `flagd-ui`, `llm`, `kafka`, `accounting`, `fraud-detection`
+
+### Fault Injection via Feature Flags
+
+Edit `src/flagd/demo.flagd.json` — flagd hot-reloads on file change, no restart needed.
+
+| Flag | Effect |
+|------|--------|
+| `paymentUnreachable` | Checkout dials wrong payment address → gRPC UNAVAILABLE |
+| `cartFailure` | Cart service returns errors |
+| `productCatalogFailure` | Product catalog errors on one product |
+| `recommendationCacheFailure` | Recommendation cache misses |
+| `paymentFailure` | Payment fails at configurable % |
+
+### SRE Training Scenarios (this fork's addition)
+
+Three scenarios activated via `python -m scenarios.scenarios activate {case1|case2|case3}`:
+
+| Case | Difficulty | Alert | What breaks | Expected RCA outcome |
+|------|-----------|-------|-------------|---------------------|
+| 1 | HARD | `AnomalousZeroValueOrders` | PHP quote silently returns $0 | Trainee walks trace 4 hops deep to find swallowed exception |
+| 2 | EASY | `PaymentServiceUnreachable` | Checkout dials `badAddress:50051` | Trainee follows alert text → Jaeger → done in 15 min |
+| 3 | IMPOSSIBLE | `ProductReviewsMemoryHigh` | Background thread leaks memory | Trainee exhausts all signals, escalates with specific ask |
+
+See `.kiro/specs/sre-debug-challenge-scenarios/golden-dataset.md` for the full grading rubric.
+
+---
+
+## Quick Start
+
+```bash
+# Start the minimal stack
+docker compose -f docker-compose.minimal.yml up -d
+
+# Wait for services to stabilize (~2 min), then verify
+curl -s http://localhost:9090/-/healthy   # Prometheus
+curl -s http://localhost:16686/           # Jaeger UI
+curl -s http://localhost:3000/api/health  # Grafana
+
+# Open the shop
+open http://localhost
+
+# Open the load generator
+open http://localhost:8089
+```
+
+---
+
+## Upstream Documentation
 
 [![Slack](https://img.shields.io/badge/slack-@cncf/otel/demo-brightgreen.svg?logo=slack)](https://cloud-native.slack.com/archives/C03B4CWV4DA)
 [![Version](https://img.shields.io/github/v/release/open-telemetry/opentelemetry-demo?color=blueviolet)](https://github.com/open-telemetry/opentelemetry-demo/releases)
