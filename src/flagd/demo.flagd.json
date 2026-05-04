@@ -1,151 +1,165 @@
 {
-  "$schema": "https://flagd.dev/schema/v0/flags.json",
-  "flags": {
-    "llmInaccurateResponse": {
-      "defaultVariant": "off",
-      "description": "LLM returns an inaccurate product summary for product ID L9ECAV7KIM",
-      "state": "ENABLED",
-      "variants": {
-        "off": false,
-        "on": true
-      }
-    },
-    "llmRateLimitError": {
-      "defaultVariant": "off",
-      "description": "LLM intermittently returns a rate limit error",
-      "state": "ENABLED",
-      "variants": {
-        "off": false,
-        "on": true
-      }
-    },
-    "productCatalogFailure": {
-      "description": "Fail product catalog service on a specific product",
-      "state": "ENABLED",
-      "variants": {
-        "on": true,
-        "off": false
-      },
-      "defaultVariant": "off"
-    },
-    "recommendationCacheFailure": {
-      "description": "Fail recommendation service cache",
-      "state": "ENABLED",
-      "variants": {
-        "on": true,
-        "off": false
-      },
-      "defaultVariant": "off"
-    },
-    "adManualGc": {
-      "description": "Triggers full manual garbage collections in the ad service",
-      "state": "ENABLED",
-      "variants": {
-        "on": true,
-        "off": false
-      },
-      "defaultVariant": "off"
-    },
-    "adHighCpu": {
-      "description": "Triggers high cpu load in the ad service",
-      "state": "ENABLED",
-      "variants": {
-        "on": true,
-        "off": false
-      },
-      "defaultVariant": "off"
-    },
-    "adFailure": {
-      "description": "Fail ad service",
-      "state": "ENABLED",
-      "variants": {
-        "on": true,
-        "off": false
-      },
-      "defaultVariant": "off"
-    },
-    "kafkaQueueProblems": {
-      "description": "Overloads Kafka queue while simultaneously introducing a consumer side delay leading to a lag spike",
-      "state": "ENABLED",
-      "variants": {
-        "on": 100,
-        "off": 0
-      },
-      "defaultVariant": "off"
-    },
-    "cartFailure": {
-      "description": "Fail cart service",
-      "state": "ENABLED",
-      "variants": {
-        "on": true,
-        "off": false
-      },
-      "defaultVariant": "on"
-    },
-    "paymentFailure": {
-      "description": "Fail payment service charge requests n%",
-      "state": "ENABLED",
-      "variants": {
-        "100%": 1,
-        "90%": 0.95,
-        "75%": 0.75,
-        "50%": 0.5,
-        "25%": 0.25,
-        "10%": 0.1,
-        "off": 0
-      },
-      "defaultVariant": "off"
-    },
-    "paymentUnreachable": {
-      "description": "Payment service is unavailable",
-      "state": "ENABLED",
-      "variants": {
-        "on": true,
-        "off": false
-      },
-      "defaultVariant": "off"
-    },
-    "loadGeneratorFloodHomepage": {
-      "description": "Flood the frontend with a large amount of requests.",
-      "state": "ENABLED",
-      "variants": {
-        "on": 100,
-        "off": 0
-      },
-      "defaultVariant": "off"
-    },
-    "imageSlowLoad": {
-      "description": "slow loading images in the frontend",
-      "state": "ENABLED",
-      "variants": {
-        "10sec": 10000,
-        "5sec": 5000,
-        "off": 0
-      },
-      "defaultVariant": "off"
-    },
-    "failedReadinessProbe": {
-      "description": "readiness probe failure for cart service",
-      "state": "ENABLED",
-      "variants": {
-        "on": true,
-        "off": false
-      },
-      "defaultVariant": "off"
-
-    },
-    "emailMemoryLeak": {
-      "description": "Memory leak in the email service.",
-      "state": "ENABLED",
-      "variants": {
-        "off": 0,
-        "1x": 1,
-        "10x": 10,
-        "100x": 100,
-        "1000x": 1000,
-        "10000x": 10000
-      },
-      "defaultVariant": "off"
+    "$schema": "https://flagd.dev/schema/v0/flags.json",
+    "flags": {
+        "llmInaccurateResponse": {
+            "_details": "LLM service returns a hardcoded wrong product summary for product ID L9ECAV7KIM.",
+            "defaultVariant": "off",
+            "description": "LLM returns an inaccurate product summary for product ID L9ECAV7KIM",
+            "state": "ENABLED",
+            "variants": {
+                "off": false,
+                "on": true
+            }
+        },
+        "llmRateLimitError": {
+            "_details": "LLM service returns HTTP 429 when the requested model name ends in '-rate-limit'. LLM-powered features degrade silently.",
+            "defaultVariant": "off",
+            "description": "LLM intermittently returns a rate limit error",
+            "state": "ENABLED",
+            "variants": {
+                "off": false,
+                "on": true
+            }
+        },
+        "productCatalogFailure": {
+            "_details": "GetProduct always returns Internal error for product ID OLJCESPC7Z. Load generator must request that product enough times to push product-catalog RPC error rate above 1% \u2014 ServiceLatencyDegradation fires after ~1 minute.",
+            "description": "Fail product catalog service on a specific product",
+            "state": "ENABLED",
+            "variants": {
+                "on": true,
+                "off": false
+            },
+            "defaultVariant": "off"
+        },
+        "recommendationCacheFailure": {
+            "_details": "Activates a buggy cache in recommendation: each population appends product IDs plus 25% extra duplicates to a growing global list. Under concurrent load this floods product-catalog with GetProduct RPCs \u2014 ServiceLatencyDegradation fires immediately.",
+            "description": "Fail recommendation service cache",
+            "state": "ENABLED",
+            "variants": {
+                "on": true,
+                "off": false
+            },
+            "defaultVariant": "off"
+        },
+        "adManualGc": {
+            "_details": "Triggers a full JVM garbage collection on every getAds call \u2014 stop-the-world pauses cause elevated ad latency.",
+            "description": "Triggers full manual garbage collections in the ad service",
+            "state": "ENABLED",
+            "variants": {
+                "on": true,
+                "off": false
+            },
+            "defaultVariant": "off"
+        },
+        "adHighCpu": {
+            "_details": "Runs a CPU burn loop on every getAds call \u2014 ad service CPU saturates.",
+            "description": "Triggers high cpu load in the ad service",
+            "state": "ENABLED",
+            "variants": {
+                "on": true,
+                "off": false
+            },
+            "defaultVariant": "off"
+        },
+        "adFailure": {
+            "_details": "Ad service throws UNAVAILABLE on ~1-in-10 getAds calls \u2014 frontend ad widgets return errors intermittently.",
+            "description": "Fail ad service",
+            "state": "ENABLED",
+            "variants": {
+                "on": true,
+                "off": false
+            },
+            "defaultVariant": "off"
+        },
+        "kafkaQueueProblems": {
+            "_details": "Fraud-detection Kafka consumer sleeps 1 second per message \u2014 consumer lag grows and queue backs up.",
+            "description": "Overloads Kafka queue while simultaneously introducing a consumer side delay leading to a lag spike",
+            "state": "ENABLED",
+            "variants": {
+                "on": 100,
+                "off": 0
+            },
+            "defaultVariant": "off"
+        },
+        "cartFailure": {
+            "_details": "Cart service routes EmptyCart to a bad store instead of Redis \u2014 checkout charges the card then fails to clear the cart with FAILED_PRECONDITION. UserJourneyAnomalyDetected fires when checkout FAILED_PRECONDITION rate exceeds 10%.",
+            "description": "Fail cart service",
+            "state": "ENABLED",
+            "variants": {
+                "on": true,
+                "off": false
+            },
+            "defaultVariant": "off"
+        },
+        "paymentFailure": {
+            "_details": "Payment service randomly throws 'Invalid token' for the configured percentage of charges (tagged app.loyalty.level=gold). At high percentages checkout error rate rises and OperationalAnomalyDetected may fire.",
+            "description": "Fail payment service charge requests n%",
+            "state": "ENABLED",
+            "variants": {
+                "100%": 1,
+                "90%": 0.95,
+                "75%": 0.75,
+                "50%": 0.5,
+                "25%": 0.25,
+                "10%": 0.1,
+                "off": 0
+            },
+            "defaultVariant": "off"
+        },
+        "paymentUnreachable": {
+            "_details": "Checkout replaces the real payment service address with 'badAddress:50051' \u2014 100% of payment RPCs fail. OperationalAnomalyDetected fires as soon as checkout error rate exceeds 50%.",
+            "description": "Payment service is unavailable",
+            "state": "ENABLED",
+            "variants": {
+                "on": true,
+                "off": false
+            },
+            "defaultVariant": "off"
+        },
+        "loadGeneratorFloodHomepage": {
+            "_details": "Load generator sends 100 additional GET / requests per virtual user tick \u2014 sudden frontend traffic spike.",
+            "description": "Flood the frontend with a large amount of requests.",
+            "state": "ENABLED",
+            "variants": {
+                "on": 100,
+                "off": 0
+            },
+            "defaultVariant": "off"
+        },
+        "imageSlowLoad": {
+            "_details": "Product card image requests include x-envoy-fault-delay-request header (5s or 10s) \u2014 Envoy injects the delay before serving images, making the product listing page appear frozen.",
+            "description": "slow loading images in the frontend",
+            "state": "ENABLED",
+            "variants": {
+                "10sec": 10000,
+                "5sec": 5000,
+                "off": 0
+            },
+            "defaultVariant": "off"
+        },
+        "failedReadinessProbe": {
+            "_details": "Cart service readiness probe returns Unhealthy \u2014 Kubernetes removes the pod from the load balancer. Same symptom as cartFailure but triggered at the infra layer; pod stays running but receives no traffic.",
+            "description": "readiness probe failure for cart service",
+            "state": "ENABLED",
+            "variants": {
+                "on": true,
+                "off": false
+            },
+            "defaultVariant": "off"
+        },
+        "emailMemoryLeak": {
+            "_details": "On each order confirmation, email service pads the body with N times its size in whitespace (1x\u201310000x). RSS grows with every completed checkout \u2014 eventual OOM.",
+            "description": "Memory leak in the email service.",
+            "state": "ENABLED",
+            "variants": {
+                "off": 0,
+                "1x": 1,
+                "10x": 10,
+                "100x": 100,
+                "1000x": 1000,
+                "10000x": 10000
+            },
+            "defaultVariant": "off"
+        }
     }
-  }
 }

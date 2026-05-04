@@ -7,8 +7,14 @@ groups:
     rules:
 
       # Case (EASY): Payment service unreachable - checkout cannot charge customers
-      # Trigger: set paymentUnreachable flag to "on" in src/flagd/demo.flagd.json
-      # Root cause : a network connectivity issue between the checkout service and the payment service, causing all payment attempts to fail.
+      # Trigger flag : paymentUnreachable = on  → fires immediately [verified]  
+      #                cartFailure        = on  → fires after ~1.5+ minutes [verified]  
+      # Root cause (paymentUnreachable): Checkout replaces the real payment service address with
+      #   'badAddress:50051', causing 100% of payment RPCs to fail immediately.
+      # Root cause (cartFailure): Cart's EmptyCart failures return FAILED_PRECONDITION back to
+      #   checkout. FAILED_PRECONDITION is a non-OK RPC status, so it accumulates in the error
+      #   rate numerator. Once enough checkouts have attempted (and failed) to clear the cart,
+      #   the overall checkout error rate crosses 50%.
       - alert: OperationalAnomalyDetected
         expr: |
           (
@@ -16,7 +22,7 @@ groups:
             /
             sum(rate(rpc_client_call_duration_seconds_count{service_name="checkout"}[5m])) by (service_name, rpc_method)
           ) > 0.5
-        for: 1m
+        for: 0m
         labels:
           severity: critical
           scenario: case_easy
@@ -25,9 +31,16 @@ groups:
           description: |
             Review system logs, traces, and metrics.
 
-      # Case (MEDIUM): Product catalog returning errors for a specific product
-      # Trigger: set productCatalogFailure flag to "on" in src/flagd/demo.flagd.json  
-              
+      # Case (MEDIUM): Product catalog returning errors
+      # Trigger flag : recommendationCacheFailure = on  → fires immediately [verified]
+      #                productCatalogFailure      = on  → fires after ~1 minute [verified]
+      # Root cause (recommendationCacheFailure): Recommendation service activates a buggy cache that
+      #   appends 25% extra duplicate IDs on each population. Under concurrent load the global list
+      #   grows unboundedly, flooding product-catalog with GetProduct RPCs until its error rate
+      #   crosses 1%.
+      # Root cause (productCatalogFailure): GetProduct always returns Internal error for product ID
+      #   OLJCESPC7Z. The load generator must request that product enough times to push the
+      #   product-catalog RPC error rate above 1%.
       - alert: ServiceLatencyDegradation
         expr: |
           (
@@ -45,10 +58,12 @@ groups:
           severity: warning
           scenario: case_medium
 
-  
+
       # Case (HARD): Cart service errors blocking user purchases
-      # Trigger: set cartFailure flag to "on" in src/flagd/demo.flagd.json
-      # Root cause: Cart storage is unreachable, causing checkout to fail when trying to clear the cart after purchase. 
+      # Trigger flag : cartFailure = on  → fires after ~1+ minute [verified]
+      # Root cause   : Cart service routes EmptyCart to a bad store instead of Redis. Checkout
+      #                charges the card successfully but then fails to clear the cart, returning
+      #                FAILED_PRECONDITION. Fires when that error rate on checkout exceeds 10%.
       - alert: UserJourneyAnomalyDetected
         expr: |
           (
@@ -68,28 +83,27 @@ groups:
           summary: "Anomalous system behavior detected"
           description: |
             An unusual pattern has been detected in system behavior. Investigate using traces, metrics, and logs.
-                          
-                       
-      # Case (VERY HARD): DB query latency spike caused by upstream cache exhaustion 
-      # Trigger: set recommendationCacheFailure flag to "on" in src/flagd/demo.flagd.json
-      # Root cause : Recommendation service cache is disabled, causing it to hammer
-      # the product catalog database with queries, which overwhelms the already-slow astronomy DB.
-      - alert: InfrastructureResourceAnomaly            
+
+
+      # Case (VERY HARD): DB query latency spike caused by upstream cache exhaustion
+      # Trigger flag : __________
+      # Root cause   : ___________________________________________________________________________
+      - alert: InfrastructureResourceAnomaly
         expr: |
           (
             sum(rate(db_client_operation_duration_seconds_sum{service_name="product-catalog"}[2m]))
             /
             sum(rate(db_client_operation_duration_seconds_count{service_name="product-catalog"}[2m]))
           ) > 0.1
-        for: 0m                    
-        labels:            
+        for: 0m
+        labels:
           severity: warning
-          scenario: case_very_hard                      
-        annotations:               
+          scenario: case_very_hard
+        annotations:
           summary: "Infrastructure resource anomaly detected"
-          description: |   
+          description: |
             An infrastructure-level anomaly has been detected. Investigate using available observability data.
-                  
+
       # High database operation latency on product-catalog
       # Indicates slow PostgreSQL queries — visible in Jaeger traces and DB metrics
       # - alert: HighDatabaseLatency
