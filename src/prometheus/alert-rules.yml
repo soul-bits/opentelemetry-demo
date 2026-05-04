@@ -75,12 +75,12 @@ groups:
       # Root cause : Recommendation service cache is disabled, causing it to hammer
       # the product catalog database with queries, which overwhelms the already-slow astronomy DB.
       - alert: InfrastructureResourceAnomaly            
-        expr: |            
-          histogram_quantile(0.95,                      
-            sum by(le)(    
-              rate(db_client_operation_duration_seconds_bucket{service_name="product-catalog"}[2m])                   
-            )              
-          ) > 4.0          
+        expr: |
+          (
+            sum(rate(db_client_operation_duration_seconds_sum{service_name="product-catalog"}[2m]))
+            /
+            sum(rate(db_client_operation_duration_seconds_count{service_name="product-catalog"}[2m]))
+          ) > 0.1
         for: 0m                    
         labels:            
           severity: warning
