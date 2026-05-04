@@ -8,7 +8,7 @@ groups:
 
       # Case (EASY): Payment service unreachable - checkout cannot charge customers
       # Trigger flag : paymentUnreachable = on  → fires immediately [verified]  
-      #                cartFailure        = on  → fires after ~1.5+ minutes [verified]  
+      #                cartFailure        = on  → fires after ~2-3+ minutes [verified]  
       # Root cause (paymentUnreachable): Checkout replaces the real payment service address with
       #   'badAddress:50051', causing 100% of payment RPCs to fail immediately.
       # Root cause (cartFailure): Cart's EmptyCart failures return FAILED_PRECONDITION back to
@@ -60,7 +60,7 @@ groups:
 
 
       # Case (HARD): Cart service errors blocking user purchases
-      # Trigger flag : cartFailure = on  → fires after ~1+ minute [verified]
+      # Trigger flag : cartFailure = on  → fires after ~1-2+ minute [verified]
       # Root cause   : Cart service routes EmptyCart to a bad store instead of Redis. Checkout
       #                charges the card successfully but then fails to clear the cart, returning
       #                FAILED_PRECONDITION. Fires when that error rate on checkout exceeds 10%.
@@ -83,26 +83,6 @@ groups:
           summary: "Anomalous system behavior detected"
           description: |
             An unusual pattern has been detected in system behavior. Investigate using traces, metrics, and logs.
-
-
-      # Case (VERY HARD): DB query latency spike caused by upstream cache exhaustion
-      # Trigger flag : __________
-      # Root cause   : ___________________________________________________________________________
-      - alert: InfrastructureResourceAnomaly
-        expr: |
-          (
-            sum(rate(db_client_operation_duration_seconds_sum{service_name="product-catalog"}[2m]))
-            /
-            sum(rate(db_client_operation_duration_seconds_count{service_name="product-catalog"}[2m]))
-          ) > 0.1
-        for: 0m
-        labels:
-          severity: warning
-          scenario: case_very_hard
-        annotations:
-          summary: "Infrastructure resource anomaly detected"
-          description: |
-            An infrastructure-level anomaly has been detected. Investigate using available observability data.
 
       # High database operation latency on product-catalog
       # Indicates slow PostgreSQL queries — visible in Jaeger traces and DB metrics
