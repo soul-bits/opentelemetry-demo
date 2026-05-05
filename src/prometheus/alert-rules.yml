@@ -6,15 +6,25 @@ groups:
     interval: 30s
     rules:
 
-      # Case (EASY): Payment service unreachable - checkout cannot charge customers
-      # Trigger flag : paymentUnreachable = on  → fires immediately [verified]  
-      #                cartFailure        = on  → fires after ~2-3+ minutes [verified]  
-      # Root cause (paymentUnreachable): Checkout replaces the real payment service address with
-      #   'badAddress:50051', causing 100% of payment RPCs to fail immediately.
-      # Root cause (cartFailure): Cart's EmptyCart failures return FAILED_PRECONDITION back to
-      #   checkout. FAILED_PRECONDITION is a non-OK RPC status, so it accumulates in the error
-      #   rate numerator. Once enough checkouts have attempted (and failed) to clear the cart,
-      #   the overall checkout error rate crosses 50%.
+      # Case (EASY): Checkout RPC error rate > 50% — critical path broken
+      #
+      # Scenario A — Payment service unreachable:
+      #   Trigger flag : paymentUnreachable = on  → fires immediately [verified]  
+      #   Impact  : 100% of payment RPCs from checkout are failing. Customers cannot complete
+      #             purchases. Revenue impact is immediate and total.
+      #   Root cause: Network connectivity failure between checkout and payment service.
+      #             Checkout is unable to establish a connection to the payment service endpoint.
+      #             Every payment attempt returns a connectivity error (e.g. connection refused /
+      #             no route to host), driving the checkout RPC error rate above 50%.
+      #
+      # Scenario B — Cart service EmptyCart failures propagating to checkout:
+      #   Trigger flag : cartFailure        = on  → fires after ~2-3+ minutes [verified]
+      #   Impact  : Checkout is accumulating non-OK RPC responses at a rate sufficient to push
+      #             its overall error rate above 50%. Customer purchases are failing at checkout.
+      #   Root cause: The cart service is returning FAILED_PRECONDITION on EmptyCart calls.
+      #             Checkout depends on EmptyCart to finalize each order; when cart rejects those
+      #             calls, checkout records them as RPC errors. Under sustained load the error
+      #             rate crosses the 50% threshold.
       - alert: OperationalAnomalyDetected
         expr: |
           (
@@ -31,16 +41,25 @@ groups:
           description: |
             Review system logs, traces, and metrics.
 
-      # Case (MEDIUM): Product catalog returning errors
-      # Trigger flag : recommendationCacheFailure = on  → fires immediately [verified]
-      #                productCatalogFailure      = on  → fires after ~1 minute [verified]
-      # Root cause (recommendationCacheFailure): Recommendation service activates a buggy cache that
-      #   appends 25% extra duplicate IDs on each population. Under concurrent load the global list
-      #   grows unboundedly, flooding product-catalog with GetProduct RPCs until its error rate
-      #   crosses 1%.
-      # Root cause (productCatalogFailure): GetProduct always returns Internal error for product ID
-      #   OLJCESPC7Z. The load generator must request that product enough times to push the
-      #   product-catalog RPC error rate above 1%.
+      # Case (MEDIUM): Product catalog RPC error rate > 1%
+      #
+      # Scenario A — Recommendation service flooding product-catalog:
+      #   Trigger flag : recommendationCacheFailure = on  → fires immediately [verified]
+      #   Impact  : Product-catalog is receiving an abnormally high volume of GetProduct RPCs
+      #             from the recommendation service, causing its error rate to rise above 1%.
+      #             Product pages and recommendations may return partial or incorrect results.
+      #   Root cause: The recommendation service has a cache population bug — under concurrent
+      #             load the internal product ID list grows unboundedly, causing the service to
+      #             issue a rapidly increasing number of GetProduct calls to product-catalog.
+      #             Product-catalog becomes overwhelmed and begins returning errors.
+      #
+      # Scenario B — Product-catalog returning Internal errors for a specific product:
+      #   Trigger flag : productCatalogFailure      = on  → fires after ~1 minute [verified]
+      #   Impact  : A subset of product lookups are consistently failing with an Internal error.
+      #             Any user or service requesting that product receives an error response.
+      #   Root cause: Product-catalog is unable to serve a specific product ID — every GetProduct
+      #             request for that item returns an Internal (5xx-equivalent) RPC status. As
+      #             traffic to that product accumulates, the server-side error rate crosses 1%.
       - alert: ServiceLatencyDegradation
         expr: |
           (
@@ -59,11 +78,18 @@ groups:
           scenario: case_medium
 
 
-      # Case (HARD): Cart service errors blocking user purchases
-      # Trigger flag : cartFailure = on  → fires after ~1-2+ minute [verified]
-      # Root cause   : Cart service routes EmptyCart to a bad store instead of Redis. Checkout
-      #                charges the card successfully but then fails to clear the cart, returning
-      #                FAILED_PRECONDITION. Fires when that error rate on checkout exceeds 10%.
+      # Case (HARD): Checkout FAILED_PRECONDITION error rate > 10% — partial order failures
+      #   Trigger flag : cartFailure = on  → fires after ~1-2+ minute [verified]
+      #   Impact  : Checkout is successfully charging customers but failing to complete order
+      #           finalization. The cart is not being cleared after payment, leaving users in
+      #           an inconsistent state (charged but order not confirmed). This is a silent
+      #           data integrity issue — revenue is collected but fulfillment is broken.
+      #   Root cause: The cart service is failing all EmptyCart operations with
+      #             FAILED_PRECONDITION, indicating it cannot reach or write to its backing
+      #             store (Valkey/Redis). Checkout calls EmptyCart after a successful payment;
+      #             when cart rejects the call, checkout returns FAILED_PRECONDITION to the
+      #             caller. As order volume accumulates, this specific error rate on checkout
+      #             exceeds 10%.
       - alert: UserJourneyAnomalyDetected
         expr: |
           (
