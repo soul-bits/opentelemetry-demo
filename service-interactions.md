@@ -107,12 +107,7 @@ graph LR
 ```mermaid
 graph LR
 
-  subgraph "User Traffic"
-    user["User (Browser)"]
-    loadgen["Load Generator (Locust)"]
-    frontend_proxy["Frontend Proxy (Envoy)"]
-    frontend["Frontend (Next.js Web UI)"]
-  end
+  frontend["Frontend (Next.js Web UI)"]
 
   subgraph "Business Services"
     cart["Cart (C# gRPC)"]
@@ -129,10 +124,6 @@ graph LR
     valkey_cart["Valkey (Cart key-value store)"]
     astronomy_db["Astronomy DB (PostgreSQL)"]
   end
-
-  loadgen -->|synthetic HTTP load| frontend_proxy
-  user -->|browses shop / places orders| frontend_proxy
-  frontend_proxy -->|routes HTTP to app| frontend
 
   frontend -->|AddItem / GetCart| cart
   frontend -->|PlaceOrder| checkout
@@ -156,6 +147,91 @@ graph LR
 
   recommendation -->|ListProducts / GetProduct - source product IDs| product_catalog
   recommendation -->|recommendationCacheFailure flag| flagd
+
+  shipping -->|/get-quote - compute shipping cost| quote
+```
+
+---
+
+## Checkout Flow (order placement detail)
+
+```mermaid
+graph LR
+
+  frontend["Frontend (Next.js Web UI)"]
+  checkout["Checkout (Go gRPC)"]
+  cart["Cart (C# gRPC)"]
+  product_catalog["Product Catalog (Go gRPC)"]
+  currency["Currency (C++ gRPC)"]
+  shipping["Shipping (Rust HTTP)"]
+  quote["Quote (Rust HTTP)"]
+  valkey_cart["Valkey (Cart key-value store)"]
+  astronomy_db["Astronomy DB (PostgreSQL)"]
+  flagd["flagd (Feature Flags)"]
+
+  frontend -->|PlaceOrder| checkout
+
+  checkout -->|GetCart - fetch items in cart| cart
+  checkout -->|GetProduct - look up price & details per item| product_catalog
+  checkout -->|Convert - convert order total to user currency| currency
+  checkout -->|/get-quote - request shipping cost estimate| shipping
+  checkout -->|/ship-order - trigger fulfillment| shipping
+  checkout -->|EmptyCart - clear cart after payment| cart
+  checkout -->|paymentUnreachable flag| flagd
+
+  cart -->|read/write cart state| valkey_cart
+  cart -->|cartFailure flag| flagd
+
+  product_catalog -->|query catalog.products| astronomy_db
+  product_catalog -->|productCatalogFailure flag| flagd
+
+  shipping -->|/get-quote - compute cost from quote service| quote
+```
+
+---
+
+## Business Services Only (no flagd, no observability)
+
+```mermaid
+graph LR
+
+  frontend["Frontend (Next.js Web UI)"]
+
+  subgraph "Business Services"
+    cart["Cart (C# gRPC)"]
+    checkout["Checkout (Go gRPC)"]
+    product_catalog["Product Catalog (Go gRPC)"]
+    recommendation["Recommendation (Python gRPC)"]
+    currency["Currency (C++ gRPC)"]
+    shipping["Shipping (Rust HTTP)"]
+    quote["Quote (Rust HTTP)"]
+    payment["Payment (Go gRPC)"]
+  end
+
+  subgraph "Data Stores"
+    valkey_cart["Valkey (Cart key-value store)"]
+    astronomy_db["Astronomy DB (PostgreSQL)"]
+  end
+
+  frontend -->|AddItem / GetCart| cart
+  frontend -->|PlaceOrder| checkout
+  frontend -->|GetProduct / ListProducts| product_catalog
+  frontend -->|ListRecommendations| recommendation
+  frontend -->|getSupportedCurrencies| currency
+  frontend -->|getShippingCost| shipping
+  frontend -->|convert shipping cost to display currency| currency
+
+  checkout -->|GetCart / EmptyCart - read & clear cart| cart
+  checkout -->|GetProduct - per-item product details| product_catalog
+  checkout -->|Convert - order totals to user currency| currency
+  checkout -->|/get-quote, /ship-order - shipping quote & fulfillment| shipping
+  checkout -->|Charge - process card payment| payment
+
+  cart -->|read/write cart items| valkey_cart
+
+  product_catalog -->|query catalog.products table| astronomy_db
+
+  recommendation -->|ListProducts / GetProduct - source product IDs| product_catalog
 
   shipping -->|/get-quote - compute shipping cost| quote
 ```
