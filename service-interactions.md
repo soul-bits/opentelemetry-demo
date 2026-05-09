@@ -325,3 +325,145 @@ graph TB
   linkStyle default stroke:#5eead4,color:#99f6e4
   linkStyle 10 stroke:#ef4444,color:#fca5a5
 ```
+
+---
+
+## Alert: ServiceLatencyDegradation — recommendationCacheFailure
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': {
+  'primaryColor': '#1a7a73',
+  'primaryTextColor': '#f0fdfa',
+  'primaryBorderColor': '#2dd4bf',
+  'lineColor': '#5eead4',
+  'secondaryColor': '#0d4a45',
+  'tertiaryColor': '#0f3d39',
+  'clusterBkg': '#0d4a45',
+  'clusterBorder': '#2dd4bf',
+  'titleColor': '#f0fdfa',
+  'background': 'transparent',
+  'edgeLabelBackground': 'transparent',
+  'fontFamily': 'monospace',
+  'fontSize': '25px'
+}}}%%
+graph TB
+
+  frontend["Frontend (Next.js Web UI)"]
+
+  subgraph cartCluster[" "]
+    cart["Cart (C# gRPC)"]
+    valkey_cart["Valkey (key-value store)"]
+  end
+
+  subgraph checkoutCluster[" "]
+    checkout["Checkout (Go gRPC)"]
+    payment["Payment (Go gRPC)"]
+  end
+
+  subgraph catalogCluster[" "]
+    product_catalog["⚠️ Product Catalog (Go gRPC)"]:::alertNode
+    recommendation["Recommendation (Python gRPC)\nrecommendationCacheFailure=on"]:::broken
+    astronomy_db["Astronomy DB (PostgreSQL)"]
+  end
+
+  subgraph pricingCluster[" "]
+    currency["Currency (C++ gRPC)"]
+    shipping["Shipping (Rust HTTP)"]
+    quote["Quote (Rust HTTP)"]
+  end
+
+  frontend -->|GetCart / AddItem| cart
+  frontend -->|PlaceOrder| checkout
+  frontend -->|GetProduct| product_catalog
+  frontend -->|ListRecommendations| recommendation
+  frontend -->|GetCurrencies| currency
+  frontend -->|GetShippingCost| shipping
+
+  checkout -->|GetCart / EmptyCart| cart
+  checkout -->|GetProduct| product_catalog
+  checkout -->|Convert| currency
+  checkout -->|Quote + Ship| shipping
+  checkout -->|Charge| payment
+
+  cart -->|read / write| valkey_cart
+  product_catalog -->|SQL query| astronomy_db
+  recommendation -. GetProduct flood .-> product_catalog
+  shipping -->|get-quote| quote
+
+  classDef broken fill:#dc2626,stroke:#ef4444,color:#fff
+  classDef alertNode fill:#f59e0b,stroke:#fbbf24,color:#000
+
+  linkStyle default stroke:#5eead4,color:#99f6e4
+  linkStyle 14 stroke:#ef4444,color:#fca5a5
+```
+
+---
+
+## Alert: UserJourneyAnomalyDetected — cartFailure
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': {
+  'primaryColor': '#1a7a73',
+  'primaryTextColor': '#f0fdfa',
+  'primaryBorderColor': '#2dd4bf',
+  'lineColor': '#5eead4',
+  'secondaryColor': '#0d4a45',
+  'tertiaryColor': '#0f3d39',
+  'clusterBkg': '#0d4a45',
+  'clusterBorder': '#2dd4bf',
+  'titleColor': '#f0fdfa',
+  'background': 'transparent',
+  'edgeLabelBackground': 'transparent',
+  'fontFamily': 'monospace',
+  'fontSize': '25px'
+}}}%%
+graph TB
+
+  frontend["Frontend (Next.js Web UI)"]
+
+  subgraph cartCluster[" "]
+    cart["Cart (C# gRPC)\ncartFailure=on"]:::broken
+    valkey_cart["Valkey (key-value store)"]:::broken
+  end
+
+  subgraph checkoutCluster[" "]
+    checkout["⚠️ Checkout (Go gRPC)"]:::alertNode
+    payment["Payment (Go gRPC)"]
+  end
+
+  subgraph catalogCluster[" "]
+    product_catalog["Product Catalog (Go gRPC)"]
+    recommendation["Recommendation (Python gRPC)"]
+    astronomy_db["Astronomy DB (PostgreSQL)"]
+  end
+
+  subgraph pricingCluster[" "]
+    currency["Currency (C++ gRPC)"]
+    shipping["Shipping (Rust HTTP)"]
+    quote["Quote (Rust HTTP)"]
+  end
+
+  frontend -->|GetCart / AddItem| cart
+  frontend -->|PlaceOrder| checkout
+  frontend -->|GetProduct| product_catalog
+  frontend -->|ListRecommendations| recommendation
+  frontend -->|GetCurrencies| currency
+  frontend -->|GetShippingCost| shipping
+
+  checkout -. EmptyCart FAILED_PRECONDITION .-> cart
+  checkout -->|GetProduct| product_catalog
+  checkout -->|Convert| currency
+  checkout -->|Quote + Ship| shipping
+  checkout -->|Charge| payment
+
+  cart -->|read / write| valkey_cart
+  product_catalog -->|SQL query| astronomy_db
+  recommendation -->|GetProduct IDs| product_catalog
+  shipping -->|get-quote| quote
+
+  classDef broken fill:#dc2626,stroke:#ef4444,color:#fff
+  classDef alertNode fill:#f59e0b,stroke:#fbbf24,color:#000
+
+  linkStyle default stroke:#5eead4,color:#99f6e4
+  linkStyle 6 stroke:#ef4444,color:#fca5a5
+```
