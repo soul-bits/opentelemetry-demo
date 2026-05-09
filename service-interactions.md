@@ -193,45 +193,135 @@ graph LR
 ## Business Services Only (no flagd, no observability)
 
 ```mermaid
-graph LR
+%%{init: {'theme': 'base', 'themeVariables': {
+  'primaryColor': '#1a7a73',
+  'primaryTextColor': '#f0fdfa',
+  'primaryBorderColor': '#2dd4bf',
+  'lineColor': '#5eead4',
+  'secondaryColor': '#0d4a45',
+  'tertiaryColor': '#0f3d39',
+  'clusterBkg': '#0d4a45',
+  'clusterBorder': '#2dd4bf',
+  'titleColor': '#f0fdfa',
+  'background': 'transparent',
+  'edgeLabelBackground': 'transparent',
+  'fontFamily': 'monospace',
+  'fontSize': '25px'
+}}}%%
+graph TB
 
   frontend["Frontend (Next.js Web UI)"]
 
-  subgraph "Business Services"
+  subgraph cartCluster[" "]
     cart["Cart (C# gRPC)"]
+    valkey_cart["Valkey (key-value store)"]
+  end
+
+  subgraph checkoutCluster[" "]
     checkout["Checkout (Go gRPC)"]
-    product_catalog["Product Catalog (Go gRPC)"]
-    recommendation["Recommendation (Python gRPC)"]
-    currency["Currency (C++ gRPC)"]
-    shipping["Shipping (Rust HTTP)"]
-    quote["Quote (Rust HTTP)"]
     payment["Payment (Go gRPC)"]
   end
 
-  subgraph "Data Stores"
-    valkey_cart["Valkey (Cart key-value store)"]
+  subgraph catalogCluster[" "]
+    product_catalog["Product Catalog (Go gRPC)"]
+    recommendation["Recommendation (Python gRPC)"]
     astronomy_db["Astronomy DB (PostgreSQL)"]
   end
 
-  frontend -->|AddItem / GetCart| cart
+  subgraph pricingCluster[" "]
+    currency["Currency (C++ gRPC)"]
+    shipping["Shipping (Rust HTTP)"]
+    quote["Quote (Rust HTTP)"]
+  end
+
+  frontend -->|GetCart / AddItem| cart
   frontend -->|PlaceOrder| checkout
-  frontend -->|GetProduct / ListProducts| product_catalog
+  frontend -->|GetProduct| product_catalog
   frontend -->|ListRecommendations| recommendation
-  frontend -->|getSupportedCurrencies| currency
-  frontend -->|getShippingCost| shipping
-  frontend -->|convert shipping cost to display currency| currency
+  frontend -->|GetCurrencies| currency
+  frontend -->|GetShippingCost| shipping
 
-  checkout -->|GetCart / EmptyCart - read & clear cart| cart
-  checkout -->|GetProduct - per-item product details| product_catalog
-  checkout -->|Convert - order totals to user currency| currency
-  checkout -->|/get-quote, /ship-order - shipping quote & fulfillment| shipping
-  checkout -->|Charge - process card payment| payment
+  checkout -->|GetCart / EmptyCart| cart
+  checkout -->|GetProduct| product_catalog
+  checkout -->|Convert| currency
+  checkout -->|Quote + Ship| shipping
+  checkout -->|Charge| payment
 
-  cart -->|read/write cart items| valkey_cart
+  cart -->|read / write| valkey_cart
+  product_catalog -->|SQL query| astronomy_db
+  recommendation -->|GetProduct IDs| product_catalog
+  shipping -->|get-quote| quote
 
-  product_catalog -->|query catalog.products table| astronomy_db
+  linkStyle default stroke:#5eead4,color:#99f6e4
+```
 
-  recommendation -->|ListProducts / GetProduct - source product IDs| product_catalog
+---
 
-  shipping -->|/get-quote - compute shipping cost| quote
+## Alert: OperationalAnomalyDetected — paymentUnreachable
+
+```mermaid
+%%{init: {'theme': 'base', 'themeVariables': {
+  'primaryColor': '#1a7a73',
+  'primaryTextColor': '#f0fdfa',
+  'primaryBorderColor': '#2dd4bf',
+  'lineColor': '#5eead4',
+  'secondaryColor': '#0d4a45',
+  'tertiaryColor': '#0f3d39',
+  'clusterBkg': '#0d4a45',
+  'clusterBorder': '#2dd4bf',
+  'titleColor': '#f0fdfa',
+  'background': 'transparent',
+  'edgeLabelBackground': 'transparent',
+  'fontFamily': 'monospace',
+  'fontSize': '25px'
+}}}%%
+graph TB
+
+  frontend["Frontend (Next.js Web UI)"]
+
+  subgraph cartCluster[" "]
+    cart["Cart (C# gRPC)"]
+    valkey_cart["Valkey (key-value store)"]
+  end
+
+  subgraph checkoutCluster[" "]
+    checkout["⚠️ Checkout (Go gRPC)"]:::alertNode
+    payment["Payment (Go gRPC)"]:::broken
+  end
+
+  subgraph catalogCluster[" "]
+    product_catalog["Product Catalog (Go gRPC)"]
+    recommendation["Recommendation (Python gRPC)"]
+    astronomy_db["Astronomy DB (PostgreSQL)"]
+  end
+
+  subgraph pricingCluster[" "]
+    currency["Currency (C++ gRPC)"]
+    shipping["Shipping (Rust HTTP)"]
+    quote["Quote (Rust HTTP)"]
+  end
+
+  frontend -->|GetCart / AddItem| cart
+  frontend -->|PlaceOrder| checkout
+  frontend -->|GetProduct| product_catalog
+  frontend -->|ListRecommendations| recommendation
+  frontend -->|GetCurrencies| currency
+  frontend -->|GetShippingCost| shipping
+
+  checkout -->|GetCart / EmptyCart| cart
+  checkout -->|GetProduct| product_catalog
+  checkout -->|Convert| currency
+  checkout -->|Quote + Ship| shipping
+  checkout -. Charge - UNAVAILABLE .-> payment
+
+  cart -->|read / write| valkey_cart
+  product_catalog -->|SQL query| astronomy_db
+  recommendation -->|GetProduct IDs| product_catalog
+  shipping -->|get-quote| quote
+
+  classDef broken fill:#dc2626,stroke:#ef4444,color:#fff
+  classDef alertNode fill:#f59e0b,stroke:#fbbf24,color:#000
+
+  linkStyle default stroke:#5eead4,color:#99f6e4
+  linkStyle 10 stroke:#ef4444,color:#fca5a5
 ```
