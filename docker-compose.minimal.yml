@@ -779,9 +779,6 @@ services:
       - ./src/prometheus/prometheus-config.yaml:/etc/prometheus/prometheus-config.yaml
       - ./src/prometheus/alert-rules.yml:/etc/prometheus/alert-rules.yml
       - ./src/prometheus/alertmanager.yml:/etc/prometheus/alertmanager.yaml
-    # ensure the volume is cleared on restart.
-    tmpfs:
-      - /prometheus
     deploy:
       resources:
         limits:
