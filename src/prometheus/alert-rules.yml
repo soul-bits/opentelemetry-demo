@@ -25,7 +25,7 @@ groups:
       #             Checkout depends on EmptyCart to finalize each order; when cart rejects those
       #             calls, checkout records them as RPC errors. Under sustained load the error
       #             rate crosses the 50% threshold.
-      - alert: OperationalAnomalyDetected
+      - alert: Easy Alert
         expr: |
           (
             sum(rate(rpc_client_call_duration_seconds_count{service_name="checkout", rpc_response_status_code!="OK"}[5m])) by (service_name, rpc_method)
@@ -41,44 +41,10 @@ groups:
           description: |
             Review system logs, traces, and metrics.
 
-      # Case (MEDIUM): Product catalog RPC error rate > 1%
-      #
-      # Scenario A — Recommendation service flooding product-catalog:
-      #   Trigger flag : recommendationCacheFailure = on  → fires immediately [verified]
-      #   Impact  : Product-catalog is receiving an abnormally high volume of GetProduct RPCs
-      #             from the recommendation service, causing its error rate to rise above 1%.
-      #             Product pages and recommendations may return partial or incorrect results.
-      #   Root cause: The recommendation service has a cache population bug — under concurrent
-      #             load the internal product ID list grows unboundedly, causing the service to
-      #             issue a rapidly increasing number of GetProduct calls to product-catalog.
-      #             Product-catalog becomes overwhelmed and begins returning errors.
-      #
-      # Scenario B — Product-catalog returning Internal errors for a specific product:
-      #   Trigger flag : productCatalogFailure      = on  → fires after ~1 minute [verified]
-      #   Impact  : A subset of product lookups are consistently failing with an Internal error.
-      #             Any user or service requesting that product receives an error response.
-      #   Root cause: Product-catalog is unable to serve a specific product ID — every GetProduct
-      #             request for that item returns an Internal (5xx-equivalent) RPC status. As
-      #             traffic to that product accumulates, the server-side error rate crosses 1%.
-      - alert: ServiceLatencyDegradation
-        expr: |
-          (
-            sum(rate(rpc_server_call_duration_seconds_count{
-              service_name="product-catalog",
-              rpc_response_status_code!="OK"
-            }[2m]))
-            /
-            sum(rate(rpc_server_call_duration_seconds_count{
-              service_name="product-catalog"
-            }[2m]))
-          ) > 0.01
-        for: 0m
-        labels:
-          severity: warning
-          scenario: case_medium
 
 
-      # Case (HARD): Checkout FAILED_PRECONDITION error rate > 10% — partial order failures
+
+      # Case (MEDIUM): Checkout FAILED_PRECONDITION error rate > 10% — partial order failures
       #   Trigger flag : cartFailure = on  → fires after ~1-2+ minute [verified]
       #   Impact  : Checkout is successfully charging customers but failing to complete order
       #           finalization. The cart is not being cleared after payment, leaving users in
@@ -90,12 +56,12 @@ groups:
       #             when cart rejects the call, checkout returns FAILED_PRECONDITION to the
       #             caller. As order volume accumulates, this specific error rate on checkout
       #             exceeds 10%.
-      - alert: UserJourneyAnomalyDetected
+      - alert: Medium alert
         expr: |
           (
             sum(rate(rpc_client_call_duration_seconds_count{
               service_name="checkout",
-              rpc_response_status_code="FAILED_PRECONDITION"
+              rpc_response_status_code="UNAVAILABLE"
             }[2m]))
             /
             sum(rate(rpc_client_call_duration_seconds_count{
@@ -110,16 +76,30 @@ groups:
           description: |
             An unusual pattern has been detected in system behavior. Investigate using traces, metrics, and logs.
 
-      # High database operation latency on product-catalog
-      # Indicates slow PostgreSQL queries — visible in Jaeger traces and DB metrics
-      # - alert: HighDatabaseLatency
-      #   expr: |
-      #     histogram_quantile(0.95,
-      #       sum(rate(db_client_operation_duration_seconds_bucket[5m])) by (le, service_name)
-      #     ) > 1.0
-      #   for: 2m
-      #   labels:
-      #     severity: warning
-      #   annotations:
-      #     summary: "High database latency on {{ $labels.service_name }}"
-      #     description: "P95 DB latency is {{ $value | humanizeDuration }} on {{ $labels.service_name }}"
+      # Case (HARD): Product catalog RPC error rate > 1%
+      #
+      # Scenario A — Recommendation service flooding product-catalog:
+      #   Trigger flag : recommendationCacheFailure = on  → fires immediately [verified]
+      #   Impact  : Product-catalog is receiving an abnormally high volume of GetProduct RPCs
+      #             from the recommendation service, causing its error rate to rise above 1%.
+      #             Product pages and recommendations may return partial or incorrect results.
+      #   Root cause: The recommendation service has a cache population bug — under concurrent
+      #             load the internal product ID list grows unboundedly, causing the service to
+      #             issue a rapidly increasing number of GetProduct calls to product-catalog.
+      #             Product-catalog becomes overwhelmed and begins returning errors.
+
+      - alert: Hard Alert
+        expr: |
+          (
+            sum(rate(rpc_server_call_duration_seconds_count{
+              service_name="product-catalog",
+              rpc_response_status_code!="OK"
+            }[2m]))
+            /
+            sum(rate(rpc_server_call_duration_seconds_count{
+              service_name="product-catalog"
+            }[2m]))
+          ) > 0.01
+        for: 0m
+        labels:
+          severity: warning
