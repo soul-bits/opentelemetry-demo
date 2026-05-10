@@ -56,7 +56,7 @@ groups:
       #             when cart rejects the call, checkout returns FAILED_PRECONDITION to the
       #             caller. As order volume accumulates, this specific error rate on checkout
       #             exceeds 10%.
-      - alert: Medium alert
+      - alert: Medium Alert
         expr: |
           (
             sum(rate(rpc_client_call_duration_seconds_count{
