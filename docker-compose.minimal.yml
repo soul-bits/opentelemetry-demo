@@ -774,7 +774,6 @@ services:
       - --web.enable-lifecycle
       - --web.route-prefix=/
       - --web.enable-otlp-receiver
-      - --enable-feature=exemplar-storage
     volumes:
       - ./src/prometheus/prometheus-config.yaml:/etc/prometheus/prometheus-config.yaml
       - ./src/prometheus/alert-rules.yml:/etc/prometheus/alert-rules.yml
